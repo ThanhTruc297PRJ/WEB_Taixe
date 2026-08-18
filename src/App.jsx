@@ -1,5 +1,5 @@
-import { Button, Card, Space } from 'antd';
-import { CheckCircleFilled } from '@ant-design/icons';
+import { Button, Card, Space } from 'antd'
+import { CheckCircleFilled } from '@ant-design/icons'
 
 function App() {
   return (
@@ -21,7 +21,7 @@ function App() {
         </div>
       </Card>
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
