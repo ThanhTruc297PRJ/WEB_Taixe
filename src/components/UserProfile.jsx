@@ -5,7 +5,6 @@ import {
   SettingOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/useAuth'
 
 const items = [
   { key: 'profile', icon: <SettingOutlined />, label: 'Thông tin tài khoản' },
@@ -15,11 +14,10 @@ const items = [
 
 function UserProfile() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
 
-  const handleClick = async ({ key }) => {
+  const handleClick = ({ key }) => {
     if (key === 'logout') {
-      await logout()
+      localStorage.removeItem('admin_token')
       navigate('/login', { replace: true })
     }
     if (key === 'profile') {
@@ -35,9 +33,7 @@ function UserProfile() {
     >
       <div className="flex items-center gap-2 cursor-pointer select-none">
         <Avatar icon={<UserOutlined />} />
-        <span className="text-sm font-medium hidden sm:inline">
-          {user?.email ?? 'Admin'}
-        </span>
+        <span className="text-sm font-medium hidden sm:inline">Admin</span>
       </div>
     </Dropdown>
   )
