@@ -1,32 +1,86 @@
-# Miscellaneous
-*.class
-*.lock
-*.log
-*.pyc
+# ==============================================================================
+# OS & IDE SPECIFIC (Global)
+# ==============================================================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
 *.swp
-.buildlog/
+*.log
 .history
+.buildlog/
+
+# ==============================================================================
+# WEBSITE: REACTJS
+# ==============================================================================
+website/node_modules/
+website/build/
+website/dist/
+website/.eslintcache
+
+# Env files (Không bao giờ push các file chứa secret lên Git)
+website/.env
+website/.env.local
+website/.env.development.local
+website/.env.test.local
+website/.env.production.local
+
+# npm/yarn logs
+website/npm-debug.log*
+website/yarn-debug.log*
+website/yarn-error.log*
+website/pnpm-debug.log*
 
 
+# ==============================================================================
+# SERVICE: FASTAPI (PYTHON)
+# ==============================================================================
+# Byte-compiled / optimized / DLL files
+service/__pycache__/
+service/*.py[cod]
+service/*$py.class
+service/*.class
 
+# Virtual environments
+service/venv/
+service/.venv/
+service/env/
+service/ENV/
+
+# Env files
+service/.env
+
+# Database (Bỏ qua file DB local SQLite nếu có dùng)
+service/*.sqlite3
+service/*.db
+
+# Pytest & Coverage
+service/.pytest_cache/
+service/.coverage
+service/htmlcov/
+
+
+# ==============================================================================
+# MOBILE: FLUTTER
+# ==============================================================================
 # Flutter repo-specific
-/bin/cache/
-/bin/internal/bootstrap.bat
-/bin/internal/bootstrap.sh
-/bin/mingit/
-/dev/benchmarks/mega_gallery/
-/dev/bots/.recipe_deps
-/dev/bots/android_tools/
-/dev/devicelab/ABresults*.json
-/dev/docs/doc/
-/dev/docs/flutter.docs.zip
-/dev/docs/lib/
-/dev/docs/pubspec.yaml
-/dev/integration_tests/**/xcuserdata
-/dev/integration_tests/**/Pods
-/packages/flutter/coverage/
-version
-analysis_benchmark.json
+/mobile/bin/cache/
+/mobile/bin/internal/bootstrap.bat
+/mobile/bin/internal/bootstrap.sh
+/mobile/bin/mingit/
+/mobile/dev/benchmarks/mega_gallery/
+/mobile/dev/bots/.recipe_deps
+/mobile/dev/bots/android_tools/
+/mobile/dev/devicelab/ABresults*.json
+/mobile/dev/docs/doc/
+/mobile/dev/docs/flutter.docs.zip
+/mobile/dev/docs/lib/
+/mobile/dev/docs/pubspec.yaml
+/mobile/dev/integration_tests/**/xcuserdata
+/mobile/dev/integration_tests/**/Pods
+/mobile/packages/flutter/coverage/
+/mobile/version
+/mobile/analysis_benchmark.json
 
 # packages file containing multi-root paths
 .packages.generated
