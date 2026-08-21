@@ -1,0 +1,32 @@
+name: Service CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ["service/**"]
+  pull_request:
+    branches: [main, develop]
+    paths: ["service/**"]
+
+defaults:
+  run:
+    working-directory: service
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Syntax check
+        run: python -m compileall main.py app
+
+      - name: Build Docker image
+        run: docker build -t webtaixe-backend:ci .
