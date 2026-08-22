@@ -1,0 +1,27 @@
+services:
+  backend1:
+    build: ./service
+    env_file:
+      - ./service/.env
+    volumes:
+      - ./service/serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    restart: unless-stopped
+
+  backend2:
+    build: ./service
+    env_file:
+      - ./service/.env
+    volumes:
+      - ./service/serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8000:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend1
+      - backend2
+    restart: unless-stopped
