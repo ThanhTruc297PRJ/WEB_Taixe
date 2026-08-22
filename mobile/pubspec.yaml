@@ -32,17 +32,28 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
+  # State management (ViewModel layer of MVVM) + DI via widget tree
+  provider: ^6.1.2
+
+  # Local event log storage (Room-equivalent)
+  sqflite: ^2.4.1
+  path: ^1.9.0
+
   # Thư viện xử lý Camera & AI cho Giai đoạn 1
   camera: ^0.11.0+1
-  google_mlkit_face_detection: ^0.11.0
-  tflite_flutter: ^0.10.4
+  # Face Mesh (468 điểm, cùng topology MediaPipe FaceMesh) — cần để tính
+  # EAR/MAR/HEAD_TILT đúng công thức lúc train model (xem
+  # docs/FEATURE_EXTRACTION.md). google_mlkit_face_detection (bounding box +
+  # ~10 landmark thưa) KHÔNG đủ điểm cho việc này.
+  google_mlkit_face_mesh_detection: ^0.3.0
+  tflite_flutter: ^0.12.1
 
   # Cảnh báo & Chạy ngầm
   audioplayers: ^6.0.0
   vibration: ^2.0.0
   flutter_foreground_task: ^8.0.0
   permission_handler: ^11.3.1
-  
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -75,6 +86,10 @@ flutter:
   # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
+
+  assets:
+    - assets/models/drowsiness_model.tflite
+    - assets/models/model_meta.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
