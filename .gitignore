@@ -59,6 +59,9 @@ service/.pytest_cache/
 service/.coverage
 service/htmlcov/
 
+# RAG vector store (regenerate with scripts/ingest_kb.py)
+service/chroma_store/
+
 
 # ==============================================================================
 # MOBILE: FLUTTER

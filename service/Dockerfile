@@ -8,6 +8,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY knowledge_base ./knowledge_base
+COPY scripts ./scripts
+RUN python scripts/ingest_kb.py
+
 COPY main.py .
 COPY app ./app
 
