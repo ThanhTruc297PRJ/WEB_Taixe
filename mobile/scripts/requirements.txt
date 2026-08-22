@@ -1,0 +1,6 @@
+# Chỉ cần khi chạy convert_svm_to_tflite.py trên máy dev — không liên quan
+# tới runtime của app Flutter.
+joblib
+scikit-learn==1.6.1
+tensorflow
+numpy
