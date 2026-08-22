@@ -30,3 +30,26 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t webtaixe-backend:ci .
+
+  # Required repo secrets:
+  #   DEPLOY_HOST    - VPS IP/hostname
+  #   DEPLOY_USER    - SSH user on the VPS
+  #   DEPLOY_SSH_KEY - private key matching an authorized_keys entry on the VPS
+  #   DEPLOY_PATH    - absolute path on the VPS where this repo (driver_monitoring_support_system)
+  #                    is cloned, e.g. /home/deploy/driver_monitoring_support_system
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+            git pull origin main
+            docker compose up -d --build backend1 backend2
