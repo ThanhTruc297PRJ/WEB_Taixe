@@ -4,6 +4,7 @@ import {
   TeamOutlined,
   WarningOutlined,
   SettingOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -13,6 +14,7 @@ const menuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan' },
   { key: '/drivers', icon: <TeamOutlined />, label: 'Quản lý tài xế' },
   { key: '/incidents', icon: <WarningOutlined />, label: 'Sự cố' },
+  { key: '/assistant', icon: <RobotOutlined />, label: 'Trợ lý an toàn' },
   { key: '/settings', icon: <SettingOutlined />, label: 'Cài đặt' },
 ]
 

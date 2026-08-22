@@ -5,6 +5,7 @@ import Login from '../pages/Login'
 import Dashboard from '../pages/Dashboard'
 import Drivers from '../pages/Drivers'
 import Incidents from '../pages/Incidents'
+import Assistant from '../pages/Assistant'
 import Settings from '../pages/Settings'
 import NotFound from '../pages/NotFound'
 
@@ -20,6 +21,7 @@ const router = createBrowserRouter([
           { path: 'dashboard', element: <Dashboard /> },
           { path: 'drivers', element: <Drivers /> },
           { path: 'incidents', element: <Incidents /> },
+          { path: 'assistant', element: <Assistant /> },
           { path: 'settings', element: <Settings /> },
         ],
       },
