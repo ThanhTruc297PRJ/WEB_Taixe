@@ -4,6 +4,8 @@ import ProtectedRoute from './ProtectedRoute'
 import Login from '../pages/Login'
 import Dashboard from '../pages/Dashboard'
 import Drivers from '../pages/Drivers'
+import Vehicles from '../pages/Vehicles'
+import Maintenance from '../pages/Maintenance'
 import Incidents from '../pages/Incidents'
 import Assistant from '../pages/Assistant'
 import Settings from '../pages/Settings'
@@ -20,6 +22,8 @@ const router = createBrowserRouter([
           { index: true, element: <Navigate to="/dashboard" replace /> },
           { path: 'dashboard', element: <Dashboard /> },
           { path: 'drivers', element: <Drivers /> },
+          { path: 'vehicles', element: <Vehicles /> },
+          { path: 'maintenance', element: <Maintenance /> },
           { path: 'incidents', element: <Incidents /> },
           { path: 'assistant', element: <Assistant /> },
           { path: 'settings', element: <Settings /> },

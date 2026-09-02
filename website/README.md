@@ -24,10 +24,25 @@ src/
 └── main.jsx
 ```
 
+## Setup
+
+```bash
+cd website
+npm install     # Cài dependencies + kích hoạt git hooks (husky, qua script "prepare")
+```
+
+Sau khi cài, kiểm tra hook đã bật:
+
+```bash
+git config core.hooksPath   # kỳ vọng in ra: website/.husky/_
+```
+
+Nếu trống, chạy `npx husky` một lần. Pre-commit hook chạy `lint-staged`
+(eslint --fix + prettier) trên các file staged.
+
 ## Scripts
 
 ```bash
-npm install     # Cài dependencies
 npm run dev     # Chạy dev server
 npm run build   # Build production
 npm run preview # Preview bản build

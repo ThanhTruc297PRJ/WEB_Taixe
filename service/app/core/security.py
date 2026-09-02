@@ -20,3 +20,14 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid or expired token: {e}",
         )
+
+
+def get_current_admin(user: dict = Depends(get_current_user)) -> dict:
+    """Chỉ cho qua user có custom claim `admin: true` (gán bằng
+    scripts/set_admin.py). Dùng cho các route quản trị viên."""
+    if user.get("admin") is not True:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Yêu cầu quyền quản trị",
+        )
+    return user

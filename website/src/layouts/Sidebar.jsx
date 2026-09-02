@@ -2,6 +2,8 @@ import { Layout, Menu } from 'antd'
 import {
   DashboardOutlined,
   TeamOutlined,
+  CarOutlined,
+  ToolOutlined,
   WarningOutlined,
   SettingOutlined,
   RobotOutlined,
@@ -13,6 +15,8 @@ const { Sider } = Layout
 const menuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan' },
   { key: '/drivers', icon: <TeamOutlined />, label: 'Quản lý tài xế' },
+  { key: '/vehicles', icon: <CarOutlined />, label: 'Danh mục xe' },
+  { key: '/maintenance', icon: <ToolOutlined />, label: 'Bảo trì xe' },
   { key: '/incidents', icon: <WarningOutlined />, label: 'Sự cố' },
   { key: '/assistant', icon: <RobotOutlined />, label: 'Trợ lý an toàn' },
   { key: '/settings', icon: <SettingOutlined />, label: 'Cài đặt' },

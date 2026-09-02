@@ -1,9 +1,37 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
+from app.core.security import get_current_admin, get_current_user
 from app.models.driver import DriverCreate
 from app.services import driver_service
 
-router = APIRouter(prefix="/drivers", tags=["drivers"])
+router = APIRouter(
+    prefix="/drivers",
+    tags=["drivers"],
+    dependencies=[Depends(get_current_admin)],
+)
+
+# Router riêng: endpoint app tài xế tự gọi để báo trạng thái kết nối —
+# chỉ cần đăng nhập, KHÔNG cần quyền admin.
+self_router = APIRouter(prefix="/drivers", tags=["drivers"])
+
+
+class PresenceUpdate(BaseModel):
+    presence: str  # "online" | "offline" | "driving"
+
+
+@self_router.put("/{driver_id}/presence")
+def update_presence(
+    driver_id: str,
+    payload: PresenceUpdate,
+    _user: dict = Depends(get_current_user),
+):
+    if payload.presence not in driver_service.PRESENCE_VALUES:
+        raise HTTPException(status_code=422, detail="Giá trị presence không hợp lệ")
+    driver = driver_service.set_presence(driver_id, payload.presence)
+    if driver is None:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    return driver
 
 
 @router.get("/")

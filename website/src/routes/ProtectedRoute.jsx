@@ -3,7 +3,7 @@ import { Spin } from 'antd'
 import { useAuth } from '../contexts/useAuth'
 
 function ProtectedRoute() {
-  const { user, loading } = useAuth()
+  const { user, isAdmin, loading } = useAuth()
 
   if (loading) {
     return (
@@ -13,7 +13,7 @@ function ProtectedRoute() {
     )
   }
 
-  return user ? <Outlet /> : <Navigate to="/login" replace />
+  return user && isAdmin ? <Outlet /> : <Navigate to="/login" replace />
 }
 
 export default ProtectedRoute

@@ -2,16 +2,17 @@ import { auth } from './firebase'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
-export async function apiPost(path, body) {
+async function request(method, path, body) {
   const idToken = await auth.currentUser?.getIdToken()
+  const hasBody = body !== undefined
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
+    method,
     headers: {
-      'Content-Type': 'application/json',
+      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
       ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
     },
-    body: JSON.stringify(body),
+    ...(hasBody ? { body: JSON.stringify(body) } : {}),
   })
 
   if (!res.ok) {
@@ -19,5 +20,11 @@ export async function apiPost(path, body) {
     throw new Error(detail?.detail || `Yêu cầu thất bại (${res.status})`)
   }
 
+  if (res.status === 204) return null
   return res.json()
 }
+
+export const apiGet = (path) => request('GET', path)
+export const apiPost = (path, body) => request('POST', path, body ?? {})
+export const apiPut = (path, body) => request('PUT', path, body ?? {})
+export const apiDelete = (path) => request('DELETE', path)

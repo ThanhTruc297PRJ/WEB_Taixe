@@ -1,11 +1,16 @@
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.security import get_current_admin
 from app.models.incident import IncidentCreate
 from app.services import incident_service
 
-router = APIRouter(prefix="/incidents", tags=["incidents"])
+router = APIRouter(
+    prefix="/incidents",
+    tags=["incidents"],
+    dependencies=[Depends(get_current_admin)],
+)
 
 
 @router.get("/")

@@ -14,10 +14,20 @@ const googleProvider = new GoogleAuthProvider()
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
+  // Phân quyền lấy từ custom claim `admin` trong ID token (gán phía backend
+  // bằng scripts/set_admin.py). Cùng Firebase project với app tài xế nên
+  // "đã đăng nhập" chưa đủ — phải là admin mới được vào web quản trị.
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const { claims } = await firebaseUser.getIdTokenResult()
+        setIsAdmin(claims.admin === true)
+      } else {
+        setIsAdmin(false)
+      }
       setUser(firebaseUser)
       setLoading(false)
     })
@@ -32,7 +42,9 @@ export function AuthProvider({ children }) {
   const logout = () => signOut(auth)
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout }}>
+    <AuthContext.Provider
+      value={{ user, isAdmin, loading, login, loginWithGoogle, logout }}
+    >
       {children}
     </AuthContext.Provider>
   )

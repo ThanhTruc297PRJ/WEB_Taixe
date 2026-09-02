@@ -43,8 +43,18 @@ function Login() {
   const [submitting, setSubmitting] = useState(false)
   const [googleSubmitting, setGoogleSubmitting] = useState(false)
   const navigate = useNavigate()
-  const { login, loginWithGoogle, user, loading } = useAuth()
+  const { login, loginWithGoogle, logout, user, isAdmin, loading } = useAuth()
   const { message } = App.useApp()
+
+  // Đăng nhập thành công nhưng không phải admin (vd: tài khoản tài xế) ->
+  // đăng xuất ngay, không cho vào web quản trị.
+  const rejectIfNotAdmin = async (signedInUser) => {
+    const { claims } = await signedInUser.getIdTokenResult()
+    if (claims.admin === true) return true
+    await logout()
+    message.error('Tài khoản này không có quyền quản trị')
+    return false
+  }
 
   if (loading) {
     return (
@@ -54,14 +64,15 @@ function Login() {
     )
   }
 
-  if (user) {
+  if (user && isAdmin) {
     return <Navigate to="/dashboard" replace />
   }
 
   const handleFinish = async ({ email, password }) => {
     setSubmitting(true)
     try {
-      await login(email, password)
+      const { user: signedIn } = await login(email, password)
+      if (!(await rejectIfNotAdmin(signedIn))) return
       message.success('Đăng nhập thành công')
       navigate('/dashboard', { replace: true })
     } catch (error) {
@@ -76,7 +87,8 @@ function Login() {
   const handleGoogleLogin = async () => {
     setGoogleSubmitting(true)
     try {
-      await loginWithGoogle()
+      const { user: signedIn } = await loginWithGoogle()
+      if (!(await rejectIfNotAdmin(signedIn))) return
       message.success('Đăng nhập thành công')
       navigate('/dashboard', { replace: true })
     } catch (error) {

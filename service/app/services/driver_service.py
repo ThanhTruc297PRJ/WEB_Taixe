@@ -1,9 +1,12 @@
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.core.firebase import db
 from app.models.driver import DriverCreate
 
 COLLECTION = "drivers"
+
+PRESENCE_VALUES = {"online", "offline", "driving"}
 
 
 def create_driver(driver: DriverCreate) -> dict:
@@ -38,3 +41,15 @@ def delete_driver(driver_id: str) -> bool:
         return False
     doc_ref.delete()
     return True
+
+
+def set_presence(driver_id: str, presence: str) -> Optional[dict]:
+    """Cập nhật trạng thái kết nối do app tài xế báo lên. Ghi kèm last_seen để
+    web phát hiện 'online nhưng mất tín hiệu' (app crash không kịp báo offline)."""
+    doc_ref = db.collection(COLLECTION).document(driver_id)
+    if not doc_ref.get().exists:
+        return None
+    doc_ref.update(
+        {"presence": presence, "last_seen": datetime.now(timezone.utc)}
+    )
+    return {"id": driver_id, **doc_ref.get().to_dict()}

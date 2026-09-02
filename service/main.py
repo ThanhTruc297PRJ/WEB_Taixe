@@ -3,8 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.firebase import db
-from app.routes import assistant, auth, consent, drivers, incidents, trips
+from app.routes import (
+    assistant,
+    auth,
+    consent,
+    drivers,
+    incidents,
+    maintenance,
+    trips,
+    vehicles,
+)
 
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)
 
@@ -36,6 +44,9 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(consent.router)
 app.include_router(drivers.router)
+app.include_router(drivers.self_router)
+app.include_router(vehicles.router)
+app.include_router(maintenance.router)
 app.include_router(trips.router)
 app.include_router(incidents.router)
 app.include_router(assistant.router)
@@ -44,23 +55,6 @@ app.include_router(assistant.router)
 @app.get("/")
 def read_root():
     return {"status": "success", "message": "Backend Driver Safety đang chạy!"}
-
-
-@app.get("/test-firestore")
-def test_firestore():
-    # Ghi thử 1 bản ghi kiểm tra lên Firestore
-    doc_ref = db.collection("system_logs").document("health_check")
-    doc_ref.set({
-        "status": "connected",
-        "message": "Firebase Admin SDK kết nối thành công!",
-    })
-
-    # Đọc lại bản ghi vừa ghi
-    doc = doc_ref.get()
-    return {
-        "status": "OK",
-        "firestore_data": doc.to_dict()
-    }
 
 
 if __name__ == "__main__":
