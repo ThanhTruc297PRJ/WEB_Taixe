@@ -105,10 +105,18 @@ class MonitoringViewModel extends ChangeNotifier {
     }
 
     _baselineCalibrator.reset();
+    _featureWindowAggregator.reset();
     _baseline = null;
     phase = MonitoringPhase.calibrating;
 
-    await _cameraFrameBuffer.start(onFrame: _onFrame);
+    try {
+      await _cameraFrameBuffer.start(onFrame: _onFrame);
+    } catch (_) {
+      phase = MonitoringPhase.idle;
+      await FlutterForegroundTask.stopService();
+      notifyListeners();
+      rethrow;
+    }
 
     notifyListeners();
   }

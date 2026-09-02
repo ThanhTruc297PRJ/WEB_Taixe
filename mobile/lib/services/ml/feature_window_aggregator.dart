@@ -30,6 +30,13 @@ class FeatureWindowAggregator {
   final List<RawFrameSignal> _window = [];
   int _samplesSinceLastEmit = 0;
 
+  /// Xoá cửa sổ trượt — gọi khi bắt đầu 1 phiên giám sát mới để tránh lẫn dữ
+  /// liệu (EAR/MAR) của phiên trước vào batch feature đầu tiên của phiên mới.
+  void reset() {
+    _window.clear();
+    _samplesSinceLastEmit = 0;
+  }
+
   /// Trả về map tên-feature -> giá trị khi đủ 1 cửa sổ mới (mỗi [stepSize]
   /// mẫu, sau khi đã tích đủ [windowSize] mẫu đầu tiên); null nếu chưa tới
   /// lúc emit.
