@@ -10,19 +10,10 @@ import '../../services/ml/feature_window_aggregator.dart';
 import '../../services/ml/landmark_feature_service.dart';
 import '../../services/ml/tflite_model_service.dart';
 import '../../services/monitoring/monitoring_task_handler.dart';
+import '../../services/alert_service.dart';
 
 enum MonitoringPhase { idle, calibrating, monitoring }
 
-/// ViewModel (MVVM) điều phối camera + landmark + hiệu chỉnh baseline + cửa
-/// sổ đặc trưng + model SVM + log + foreground service. Provider đóng vai
-/// trò DI — tương đương phần việc Hilt Module đảm nhiệm bên native Android.
-///
-/// Luồng xử lý mỗi phiên giám sát:
-///   1. calibrating: ~5s đầu, giả định tài xế tỉnh táo, thu EAR/MAR làm
-///      baseline cá nhân (thay cho "Alert-only baseline theo nhãn" lúc train
-///      — không tái tạo được lúc chạy thật vì không có nhãn).
-///   2. monitoring: mỗi mẫu (~6Hz) đưa vào cửa sổ trượt 60 mẫu/bước 15 mẫu;
-///      đủ 1 cửa sổ thì tính 28 feature -> chạy model SVM -> so threshold.
 class MonitoringViewModel extends ChangeNotifier {
   MonitoringViewModel({
     CameraFrameBuffer? cameraFrameBuffer,
@@ -31,12 +22,14 @@ class MonitoringViewModel extends ChangeNotifier {
     EventLogRepository? eventLogRepository,
     BaselineCalibrator? baselineCalibrator,
     FeatureWindowAggregator? featureWindowAggregator,
-  })  : _cameraFrameBuffer = cameraFrameBuffer ?? CameraFrameBuffer(),
-        _landmarkFeatureService = landmarkFeatureService ?? LandmarkFeatureService(),
-        _tfliteModelService = tfliteModelService ?? TFLiteModelService(),
-        _eventLogRepository = eventLogRepository ?? EventLogRepository(),
-        _baselineCalibrator = baselineCalibrator ?? BaselineCalibrator(),
-        _featureWindowAggregator = featureWindowAggregator ?? FeatureWindowAggregator();
+  }) : _cameraFrameBuffer = cameraFrameBuffer ?? CameraFrameBuffer(),
+       _landmarkFeatureService =
+           landmarkFeatureService ?? LandmarkFeatureService(),
+       _tfliteModelService = tfliteModelService ?? TFLiteModelService(),
+       _eventLogRepository = eventLogRepository ?? EventLogRepository(),
+       _baselineCalibrator = baselineCalibrator ?? BaselineCalibrator(),
+       _featureWindowAggregator =
+           featureWindowAggregator ?? FeatureWindowAggregator();
 
   final CameraFrameBuffer _cameraFrameBuffer;
   final LandmarkFeatureService _landmarkFeatureService;
@@ -45,16 +38,13 @@ class MonitoringViewModel extends ChangeNotifier {
   final BaselineCalibrator _baselineCalibrator;
   final FeatureWindowAggregator _featureWindowAggregator;
 
-  // ~6Hz: khớp SAMPLE_RATE=5 trên video 30fps lúc train (30/5 = 6 mẫu/giây).
-  // Chạy nhanh hơn phân phối lúc train sẽ khiến EAR_vel/slope/PERCLOS lệch.
+  final AlertService _alertService = AlertService();
+
   static const _sampleInterval = Duration(milliseconds: 166);
   DateTime? _lastSampleAt;
 
   EarMarBaseline? _baseline;
 
-  // Android giới hạn ~5 lần cập nhật notification/giây; gửi mỗi mẫu (~6Hz)
-  // sẽ bị hệ thống rate-limit và log "Shedding notify" (đã thấy khi chạy
-  // thật trên emulator). Chỉ gửi khi nội dung đổi hoặc đã lâu chưa gửi.
   static const _statusMinInterval = Duration(milliseconds: 1000);
   DateTime? _lastStatusAt;
 
@@ -73,7 +63,8 @@ class MonitoringViewModel extends ChangeNotifier {
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'driver_monitoring_service',
         channelName: 'Giám sát an toàn lái xe',
-        channelDescription: 'Thông báo khi ứng dụng đang giám sát trạng thái tài xế.',
+        channelDescription:
+            'Thông báo khi ứng dụng đang giám sát trạng thái tài xế.',
         onlyAlertOnce: true,
       ),
       iosNotificationOptions: const IOSNotificationOptions(),
@@ -127,6 +118,8 @@ class MonitoringViewModel extends ChangeNotifier {
     await _cameraFrameBuffer.stop();
     await FlutterForegroundTask.stopService();
 
+    _alertService.stopAlert();
+
     phase = MonitoringPhase.idle;
     lastDrowsyProbability = null;
     _baseline = null;
@@ -135,14 +128,18 @@ class MonitoringViewModel extends ChangeNotifier {
 
   void _sendStatus(String text) {
     final now = DateTime.now();
-    if (_lastStatusAt != null && now.difference(_lastStatusAt!) < _statusMinInterval) return;
+    if (_lastStatusAt != null &&
+        now.difference(_lastStatusAt!) < _statusMinInterval) {
+      return;
+    }
     _lastStatusAt = now;
     FlutterForegroundTask.sendDataToTask(text);
   }
 
   void _onFrame(InputImage image) {
     final now = DateTime.now();
-    if (_lastSampleAt != null && now.difference(_lastSampleAt!) < _sampleInterval) {
+    if (_lastSampleAt != null &&
+        now.difference(_lastSampleAt!) < _sampleInterval) {
       return;
     }
     _lastSampleAt = now;
@@ -158,7 +155,8 @@ class MonitoringViewModel extends ChangeNotifier {
 
     if (phase == MonitoringPhase.calibrating) {
       _baselineCalibrator.addSample(signal);
-      final progress = '${_baselineCalibrator.collected}/${_baselineCalibrator.minSamples}';
+      final progress =
+          '${_baselineCalibrator.collected}/${_baselineCalibrator.minSamples}';
       _sendStatus('Đang hiệu chỉnh... $progress');
       notifyListeners();
 
@@ -174,7 +172,7 @@ class MonitoringViewModel extends ChangeNotifier {
     if (phase != MonitoringPhase.monitoring || baseline == null) return;
 
     final features = _featureWindowAggregator.addSample(signal, baseline);
-    if (features == null) return; // chưa đủ 1 cửa sổ mới
+    if (features == null) return;
 
     if (!_tfliteModelService.isLoaded) {
       _sendStatus('Model chưa sẵn sàng');
@@ -195,14 +193,20 @@ class MonitoringViewModel extends ChangeNotifier {
     );
 
     if (isDrowsy) {
-      final log = await _eventLogRepository.insert(EventLog(
-        type: EventType.drowsiness,
-        message: 'Model phát hiện dấu hiệu buồn ngủ',
-        timestamp: now,
-        confidence: probability,
-      ));
+      _alertService.triggerDrowsinessAlert();
+
+      final log = await _eventLogRepository.insert(
+        EventLog(
+          type: EventType.drowsiness,
+          message: 'Model phát hiện dấu hiệu buồn ngủ',
+          timestamp: now,
+          confidence: probability,
+        ),
+      );
       recentLogs = [log, ...recentLogs].take(50).toList();
       notifyListeners();
+    } else {
+      _alertService.stopAlert();
     }
   }
 
@@ -214,6 +218,7 @@ class MonitoringViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _cameraFrameBuffer.stop();
+    _alertService.stopAlert();
     _landmarkFeatureService.dispose();
     _tfliteModelService.dispose();
     super.dispose();

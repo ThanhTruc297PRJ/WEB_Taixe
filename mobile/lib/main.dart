@@ -1,27 +1,75 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:provider/provider.dart';
-
 import 'presentation/screens/monitoring_screen.dart';
+import 'presentation/screens/map_screen.dart';
+import 'presentation/screens/report_screen.dart';
 import 'presentation/viewmodels/monitoring_view_model.dart';
 
 void main() {
-  // Cần gọi trước runApp để nhận dữ liệu từ MonitoringTaskHandler.
-  FlutterForegroundTask.initCommunicationPort();
-  runApp(const DriverSafetyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => MonitoringViewModel())],
+      child: const MyApp(),
+    ),
+  );
 }
 
-class DriverSafetyApp extends StatelessWidget {
-  const DriverSafetyApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => MonitoringViewModel(),
-      child: MaterialApp(
-        title: 'Driver Safety Monitoring',
-        theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
-        home: const MonitoringScreen(),
+    return MaterialApp(
+      title: 'Hệ Thống Giám Sát Tài Xế',
+      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: false),
+      home: const MainScreen(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int _selectedIndex = 0;
+
+  final List<Widget> _screens = [
+    const MonitoringScreen(),
+    const MapScreen(),
+    const ReportScreen(),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(index: _selectedIndex, children: _screens),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.videocam),
+            label: 'Giám sát AI',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Bản đồ'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.report_problem),
+            label: 'Báo cáo',
+          ),
+        ],
       ),
     );
   }
