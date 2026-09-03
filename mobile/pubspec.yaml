@@ -56,6 +56,14 @@ dependencies:
   vibration: ^2.0.0
   flutter_foreground_task: ^8.0.0
   permission_handler: ^11.3.1
+  http: ^1.6.0
+  flutter_zoom_drawer: ^3.2.0
+  google_fonts: ^8.2.1
+  animate_do: ^5.1.0
+  fluentui_system_icons: ^1.1.273
+  lottie: ^3.3.3
+  shared_preferences: ^2.5.5
+  intl: ^0.20.3
 
 dev_dependencies:
   flutter_test:
