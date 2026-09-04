@@ -15,10 +15,6 @@ class MonitoringScreen extends StatefulWidget {
 }
 
 class _MonitoringScreenState extends State<MonitoringScreen> {
-  // Chặn bấm chồng: nếu người dùng bấm nút lần 2 trong lúc request quyền /
-  // start() còn đang chạy dở, permission_handler ném PlatformException
-  // "A request for permissions is already running" (đã thấy khi chạy thật
-  // trên emulator).
   bool _isToggling = false;
 
   @override
@@ -32,7 +28,10 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   }
 
   Future<bool> _ensurePermissions() async {
-    final statuses = await [Permission.camera, Permission.notification].request();
+    final statuses = await [
+      Permission.camera,
+      Permission.notification,
+    ].request();
     return statuses.values.every((s) => s.isGranted);
   }
 
@@ -47,16 +46,18 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       if (!await _ensurePermissions()) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cần quyền Camera & Thông báo để giám sát')),
+          const SnackBar(
+            content: Text('Cần quyền Camera & Thông báo để giám sát'),
+          ),
         );
         return;
       }
       await vm.start();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể bắt đầu giám sát: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Không thể bắt đầu giám sát: $e')));
     } finally {
       if (mounted) setState(() => _isToggling = false);
     }
@@ -76,7 +77,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
             children: [
               AspectRatio(
                 aspectRatio: 3 / 4,
-                child: _CameraPreview(controller: vm.cameraFrameBuffer.controller),
+                child: _CameraPreview(
+                  controller: vm.cameraFrameBuffer.controller,
+                ),
               ),
               const SizedBox(height: 16),
               _StatusCard(vm: vm),
@@ -84,7 +87,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
               ElevatedButton.icon(
                 onPressed: _isToggling ? null : () => _toggleMonitoring(vm),
                 icon: Icon(vm.isMonitoring ? Icons.stop : Icons.play_arrow),
-                label: Text(vm.isMonitoring ? 'Dừng giám sát' : 'Bắt đầu giám sát'),
+                label: Text(
+                  vm.isMonitoring ? 'Dừng giám sát' : 'Bắt đầu giám sát',
+                ),
               ),
               const SizedBox(height: 16),
               Expanded(child: _RecentLogList(logs: vm.recentLogs)),
@@ -121,13 +126,20 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, color, label) = switch (vm.phase) {
-      MonitoringPhase.idle => (Icons.hourglass_empty, Colors.grey, 'Chưa giám sát'),
+      MonitoringPhase.idle => (
+        Icons.hourglass_empty,
+        Colors.grey,
+        'Chưa giám sát',
+      ),
       MonitoringPhase.calibrating => (
-          Icons.tune,
-          Colors.blue,
-          'Đang hiệu chỉnh... ${vm.calibrationProgress}/${vm.calibrationTarget}',
-        ),
-      MonitoringPhase.monitoring => _monitoringStatus(vm.lastDrowsyProbability, vm.drowsyThreshold),
+        Icons.tune,
+        Colors.blue,
+        'Đang hiệu chỉnh... ${vm.calibrationProgress}/${vm.calibrationTarget}',
+      ),
+      MonitoringPhase.monitoring => _monitoringStatus(
+        vm.lastDrowsyProbability,
+        vm.drowsyThreshold,
+      ),
     };
 
     return Card(
@@ -144,13 +156,20 @@ class _StatusCard extends StatelessWidget {
     );
   }
 
-  (IconData, Color, String) _monitoringStatus(double? probability, double threshold) {
+  (IconData, Color, String) _monitoringStatus(
+    double? probability,
+    double threshold,
+  ) {
     if (probability == null) {
       return (Icons.search, Colors.grey, 'Đang phân tích...');
     }
     final percent = (probability * 100).toStringAsFixed(0);
     if (probability >= threshold) {
-      return (Icons.warning_amber, Colors.red, 'Cảnh báo: buồn ngủ! ($percent%)');
+      return (
+        Icons.warning_amber,
+        Colors.red,
+        'Cảnh báo: buồn ngủ! ($percent%)',
+      );
     }
     return (Icons.check_circle, Colors.green, 'Bình thường ($percent%)');
   }

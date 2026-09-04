@@ -1,22 +1,42 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
+import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
+
+class SongModel {
+  final String id;
+  final String title;
+  final String artist;
+  final String audioUrl;
+  final String? artworkUrl;
+  final bool isLocal;
+
+  SongModel({
+    required this.id,
+    required this.title,
+    required this.artist,
+    required this.audioUrl,
+    this.artworkUrl,
+    this.isLocal = false,
+  });
+}
 
 class MusicViewModel extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  List<dynamic> searchResults = [];
+  SongModel? currentTrack;
+  bool isPlaying = false;
   bool isLoading = false;
 
-  Map<String, dynamic>? currentTrack;
-  int currentIndex = -1;
-  bool isPlaying = false;
-  bool showPopup = false; // Điều khiển việc hiện tai thỏ
+  List<SongModel> searchResults = [];
+  final List<SongModel> favorites = [];
+  final List<SongModel> history = [];
 
   MusicViewModel() {
     _audioPlayer.onPlayerComplete.listen((_) {
-      playNext(); // Hết bài tự chuyển bài tiếp theo
+      isPlaying = false;
+      notifyListeners();
     });
   }
 
@@ -27,58 +47,108 @@ class MusicViewModel extends ChangeNotifier {
 
     try {
       final url = Uri.parse(
-        'https://itunes.apple.com/search?term=${Uri.encodeComponent(query)}&entity=song&limit=25',
+        'https://itunes.apple.com/search?term=${Uri.encodeComponent(query)}&media=music&limit=25',
       );
       final response = await http.get(url);
+
       if (response.statusCode == 200) {
-        searchResults = json.decode(response.body)['results'];
+        final data = json.decode(response.body);
+        final List results = data['results'];
+        searchResults = results
+            .where((item) => item['previewUrl'] != null)
+            .map(
+              (item) => SongModel(
+                id: item['trackId'].toString(),
+                title: item['trackName'] ?? 'Không rõ tiêu đề',
+                artist: item['artistName'] ?? 'Không rõ ca sĩ',
+                audioUrl: item['previewUrl'],
+                artworkUrl: item['artworkUrl100'],
+                isLocal: false,
+              ),
+            )
+            .toList();
       }
-    } catch (e) {
-      debugPrint('Lỗi tìm nhạc: $e');
-    } finally {
-      isLoading = false;
-      notifyListeners();
+    } catch (_) {
+      searchResults = [];
     }
+
+    isLoading = false;
+    notifyListeners();
   }
 
-  Future<void> playTrack(Map<String, dynamic> track, int index) async {
-    if (currentTrack != null && currentTrack!['trackId'] == track['trackId']) {
-      togglePlayPause();
-    } else {
-      final url = track['previewUrl'];
-      if (url != null) {
-        await _audioPlayer.play(UrlSource(url));
-        currentTrack = track;
-        currentIndex = index;
-        isPlaying = true;
-        showPopup = true;
-        notifyListeners();
+  void clearSearch() {
+    searchResults.clear();
+    notifyListeners();
+  }
+
+  Future<void> pickLocalAudioFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.pickFiles(
+        type: FileType.audio,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = result.files.single;
+        final localSong = SongModel(
+          id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+          title: file.name.replaceAll('.mp3', ''),
+          artist: 'Bộ nhớ thiết bị',
+          audioUrl: file.path!,
+          isLocal: true,
+        );
+        playTrack(localSong);
       }
+    } catch (_) {}
+  }
+
+  Future<void> playTrack(SongModel track) async {
+    if (currentTrack?.id == track.id) {
+      togglePlayPause();
+      return;
     }
+
+    currentTrack = track;
+    history.removeWhere((item) => item.id == track.id);
+    history.insert(0, track);
+
+    await _audioPlayer.stop();
+    if (track.isLocal) {
+      await _audioPlayer.play(DeviceFileSource(track.audioUrl));
+    } else {
+      await _audioPlayer.play(UrlSource(track.audioUrl));
+    }
+    isPlaying = true;
+    notifyListeners();
   }
 
   void togglePlayPause() async {
     if (isPlaying) {
       await _audioPlayer.pause();
       isPlaying = false;
-    } else {
+    } else if (currentTrack != null) {
       await _audioPlayer.resume();
       isPlaying = true;
     }
     notifyListeners();
   }
 
-  void playNext() {
-    if (searchResults.isNotEmpty && currentIndex < searchResults.length - 1) {
-      playTrack(searchResults[currentIndex + 1], currentIndex + 1);
+  bool isFavorite(String songId) {
+    return favorites.any((item) => item.id == songId);
+  }
+
+  void toggleFavorite(SongModel track) {
+    if (isFavorite(track.id)) {
+      favorites.removeWhere((item) => item.id == track.id);
+    } else {
+      favorites.add(track);
     }
+    notifyListeners();
   }
 
   void closePlayer() {
     _audioPlayer.stop();
     isPlaying = false;
     currentTrack = null;
-    showPopup = false;
     notifyListeners();
   }
 

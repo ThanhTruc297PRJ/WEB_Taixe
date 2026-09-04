@@ -193,7 +193,7 @@ class MonitoringViewModel extends ChangeNotifier {
     );
 
     if (isDrowsy) {
-      _alertService.triggerDrowsinessAlert();
+      _alertService.playWarningAlert();
 
       final log = await _eventLogRepository.insert(
         EventLog(
