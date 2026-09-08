@@ -1,8 +1,16 @@
+import asyncio
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import settings
+from app.core.middleware import ip_whitelist_middleware, request_logging_middleware
+from app.core.rate_limit import limiter
 from app.routes import (
     assistant,
     auth,
@@ -10,11 +18,40 @@ from app.routes import (
     drivers,
     incidents,
     maintenance,
+    sync,
     trips,
     vehicles,
+    websocket,
+)
+from app.services.websocket_manager import manager
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)
+
+
+@app.on_event("startup")
+async def _start_heartbeat_monitor():
+    app.state.heartbeat_task = asyncio.create_task(manager.heartbeat_monitor())
+
+
+@app.on_event("shutdown")
+async def _stop_heartbeat_monitor():
+    task = getattr(app.state, "heartbeat_task", None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 
 # Registered before CORSMiddleware below: Starlette wraps middleware in the
@@ -32,12 +69,17 @@ async def catch_unhandled_exceptions(request: Request, call_next):
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
+# B04: structured request logging + optional IP whitelist.
+app.middleware("http")(request_logging_middleware)
+app.middleware("http")(ip_whitelist_middleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
 )
 
 
@@ -50,10 +92,22 @@ app.include_router(maintenance.router)
 app.include_router(trips.router)
 app.include_router(incidents.router)
 app.include_router(assistant.router)
+app.include_router(websocket.router)
+app.include_router(sync.router)
+
+
+@app.get("/health")
+@limiter.exempt
+def health(request: Request):
+    return {
+        "status": "ok",
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+    }
 
 
 @app.get("/")
-def read_root():
+def read_root(request: Request):
     return {"status": "success", "message": "Backend Driver Safety đang chạy!"}
 
 
