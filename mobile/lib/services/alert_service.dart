@@ -17,9 +17,11 @@ class AlertService {
       _isPlaying = true;
       await _audioPlayer.stop();
 
+      // Dùng asset đang có trong pubspec (assets/audio/alarm.mp3). File
+      // sounds/alert_alarm.mp3 chưa được thêm vào assets.
       final soundSource = (customSoundUrl != null && customSoundUrl.isNotEmpty)
           ? UrlSource(customSoundUrl)
-          : AssetSource('sounds/alert_alarm.mp3');
+          : AssetSource('audio/alarm.mp3');
 
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.play(soundSource);
