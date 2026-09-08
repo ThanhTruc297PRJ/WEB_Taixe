@@ -12,11 +12,20 @@ class MusicScreen extends StatefulWidget {
   State<MusicScreen> createState() => _MusicScreenState();
 }
 
-class _MusicScreenState extends State<MusicScreen> {
+class _MusicScreenState extends State<MusicScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
   void dispose() {
+    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -26,200 +35,277 @@ class _MusicScreenState extends State<MusicScreen> {
     final musicVM = context.watch<MusicViewModel>();
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFFFF0F0), Colors.white],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            colors: [Color(0xFF0B101E), Color(0xFF151D30)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
-        child: Column(
-          children: [
-            // Thanh tìm kiếm thiết kế nổi (Floating Search Bar)
-            FadeInDown(
-              duration: const Duration(milliseconds: 500),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFD32F2F).withOpacity(0.08),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Tìm bài hát, ca sĩ...',
-                      hintStyle: TextStyle(color: Colors.grey.shade400),
-                      prefixIcon: const Icon(
-                        FluentIcons.search_24_regular,
-                        color: Color(0xFFD32F2F),
-                      ),
-                      suffixIcon: IconButton(
-                        icon: const Icon(
-                          FluentIcons.dismiss_24_regular,
-                          color: Colors.grey,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                          ),
                         ),
-                        onPressed: () {
-                          _searchController.clear();
-                          musicVM.searchResults.clear();
-                          musicVM.notifyListeners();
-                        },
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Tìm bài hát online...',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                            ),
+                            prefixIcon: const Icon(
+                              FluentIcons.search_24_regular,
+                              color: Colors.cyanAccent,
+                              size: 20,
+                            ),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(
+                                      FluentIcons.dismiss_20_regular,
+                                      color: Colors.grey,
+                                      size: 18,
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      musicVM.clearSearch();
+                                    },
+                                  )
+                                : null,
+                            border: InputBorder.none,
+                          ),
+                          onSubmitted: (val) {
+                            FocusScope.of(context).unfocus();
+                            _tabController.animateTo(0);
+                            musicVM.searchMusic(val);
+                          },
+                        ),
                       ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    onSubmitted: (query) {
-                      FocusScope.of(context).unfocus();
-                      musicVM.searchMusic(query);
-                    },
-                  ),
+                    const SizedBox(width: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.cyanAccent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          FluentIcons.folder_open_24_filled,
+                          color: Colors.cyanAccent,
+                        ),
+                        tooltip: 'Mở bài hát trong máy',
+                        onPressed: () => musicVM.pickLocalAudioFile(),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-
-            Expanded(
-              child: musicVM.isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFFD32F2F),
-                      ),
-                    )
-                  : musicVM.searchResults.isEmpty
-                  ? FadeInUp(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              FluentIcons.music_note_1_24_regular,
-                              size: 64,
-                              color: Colors.grey.shade300,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Kho nhạc trực tuyến',
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(
-                        left: 20,
-                        right: 20,
-                        bottom: 100,
-                        top: 10,
-                      ),
-                      itemCount: musicVM.searchResults.length,
-                      itemBuilder: (context, index) {
-                        final track = musicVM.searchResults[index];
-                        final isCurrent =
-                            musicVM.currentTrack != null &&
-                            musicVM.currentTrack!['trackId'] ==
-                                track['trackId'];
-
-                        return FadeInUp(
-                          delay: Duration(milliseconds: 50 * (index % 10)),
-                          duration: const Duration(milliseconds: 400),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: isCurrent
-                                  ? const Color(0xFFFFF5F5)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isCurrent
-                                    ? const Color(0xFFD32F2F).withOpacity(0.3)
-                                    : Colors.transparent,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.03),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
-                              ),
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  track['artworkUrl100'] ?? '',
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    width: 50,
-                                    height: 50,
-                                    color: Colors.grey.shade100,
-                                    child: Icon(
-                                      FluentIcons.music_note_1_24_regular,
-                                      color: Colors.grey.shade400,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                track['trackName'] ?? 'Không rõ',
-                                style: TextStyle(
-                                  fontWeight: isCurrent
-                                      ? FontWeight.bold
-                                      : FontWeight.w600,
-                                  color: isCurrent
-                                      ? const Color(0xFFD32F2F)
-                                      : Colors.black87,
-                                  fontSize: 15,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                track['artistName'] ?? '',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 13,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: isCurrent && musicVM.isPlaying
-                                  ? const Icon(
-                                      FluentIcons.sound_wave_circle_24_filled,
-                                      color: Color(0xFFD32F2F),
-                                      size: 28,
-                                    )
-                                  : const Icon(
-                                      FluentIcons.play_circle_24_regular,
-                                      color: Colors.grey,
-                                    ),
-                              onTap: () => musicVM.playTrack(track, index),
-                            ),
-                          ),
-                        );
-                      },
+              TabBar(
+                controller: _tabController,
+                indicatorColor: Colors.cyanAccent,
+                labelColor: Colors.cyanAccent,
+                unselectedLabelColor: Colors.white54,
+                tabs: const [
+                  Tab(text: 'Khám phá'),
+                  Tab(text: 'Yêu thích'),
+                  Tab(text: 'Đã nghe'),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildOnlineTab(musicVM),
+                    _buildSongList(
+                      musicVM.favorites,
+                      musicVM,
+                      'Chưa có bài hát yêu thích nào.',
                     ),
+                    _buildSongList(
+                      musicVM.history,
+                      musicVM,
+                      'Lịch sử phát trống.',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOnlineTab(MusicViewModel musicVM) {
+    if (musicVM.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.cyanAccent),
+      );
+    }
+    if (musicVM.searchResults.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              FluentIcons.music_note_2_24_regular,
+              size: 56,
+              color: Colors.white.withValues(alpha: 0.2),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Nhập từ khóa tìm kiếm hoặc chọn mở bài hát trong máy',
+              style: TextStyle(color: Colors.white54, fontSize: 13),
             ),
           ],
         ),
-      ),
+      );
+    }
+    return _buildSongList(
+      musicVM.searchResults,
+      musicVM,
+      'Không tìm thấy bài hát.',
+    );
+  }
+
+  Widget _buildSongList(
+    List<SongModel> list,
+    MusicViewModel musicVM,
+    String emptyMessage,
+  ) {
+    if (list.isEmpty) {
+      return Center(
+        child: Text(
+          emptyMessage,
+          style: const TextStyle(color: Colors.white54),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 120),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        final song = list[index];
+        final isCurrent = musicVM.currentTrack?.id == song.id;
+        final isFav = musicVM.isFavorite(song.id);
+
+        return FadeInUp(
+          delay: Duration(milliseconds: 30 * (index % 10)),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: isCurrent
+                  ? Colors.cyanAccent.withValues(alpha: 0.08)
+                  : Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isCurrent
+                    ? Colors.cyanAccent.withValues(alpha: 0.3)
+                    : Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 2,
+              ),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: song.isLocal || song.artworkUrl == null
+                    ? Container(
+                        width: 44,
+                        height: 44,
+                        color: Colors.cyanAccent.withValues(alpha: 0.15),
+                        child: const Icon(
+                          FluentIcons.music_note_1_24_filled,
+                          color: Colors.cyanAccent,
+                          size: 20,
+                        ),
+                      )
+                    : Image.network(
+                        song.artworkUrl!,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          width: 44,
+                          height: 44,
+                          color: Colors.white10,
+                          child: const Icon(
+                            FluentIcons.music_note_1_24_regular,
+                            color: Colors.white54,
+                          ),
+                        ),
+                      ),
+              ),
+              title: Text(
+                song.title,
+                style: TextStyle(
+                  color: isCurrent ? Colors.cyanAccent : Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                song.artist,
+                style: const TextStyle(color: Colors.white60, fontSize: 12),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      isFav
+                          ? FluentIcons.heart_24_filled
+                          : FluentIcons.heart_24_regular,
+                      color: isFav ? Colors.redAccent : Colors.white38,
+                      size: 20,
+                    ),
+                    onPressed: () => musicVM.toggleFavorite(song),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      isCurrent && musicVM.isPlaying
+                          ? FluentIcons.pause_circle_24_filled
+                          : FluentIcons.play_circle_24_regular,
+                      color: isCurrent ? Colors.cyanAccent : Colors.white70,
+                      size: 28,
+                    ),
+                    onPressed: () => musicVM.playTrack(song),
+                  ),
+                ],
+              ),
+              onTap: () => musicVM.playTrack(song),
+            ),
+          ),
+        );
+      },
     );
   }
 }

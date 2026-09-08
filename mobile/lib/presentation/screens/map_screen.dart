@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -10,55 +11,109 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  GoogleMapController? _mapController;
-  LatLng _initialPosition = const LatLng(
-    10.762622,
-    106.660172,
-  ); // Tọa độ mặc định TP.HCM
+  final Completer<GoogleMapController> _controller = Completer();
+  LatLng? _initialPosition;
+  StreamSubscription<Position>? _positionStream;
+
+  static const LatLng _defaultLocation = LatLng(10.762622, 106.660172);
 
   @override
   void initState() {
     super.initState();
-    _determinePosition();
+    _initLocation();
   }
 
-  Future<void> _determinePosition() async {
+  Future<void> _initLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
+    if (!serviceEnabled) {
+      await Geolocator.openLocationSettings();
+    }
 
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
+      if (permission == LocationPermission.denied) {
+        setState(() => _initialPosition = _defaultLocation);
+        return;
+      }
     }
 
-    Position position = await Geolocator.getCurrentPosition();
-    LatLng currentLatLng = LatLng(position.latitude, position.longitude);
+    if (permission == LocationPermission.deniedForever) {
+      setState(() => _initialPosition = _defaultLocation);
+      return;
+    }
 
-    setState(() {
-      _initialPosition = currentLatLng;
-    });
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+        timeLimit: const Duration(seconds: 5),
+      );
+      setState(() {
+        _initialPosition = LatLng(position.latitude, position.longitude);
+      });
+      _animateToPosition(_initialPosition!);
+    } catch (_) {
+      setState(() => _initialPosition = _defaultLocation);
+    }
 
-    _mapController?.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: currentLatLng, zoom: 15),
-      ),
-    );
+    _positionStream =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+          ),
+        ).listen((Position position) {
+          final newLatLng = LatLng(position.latitude, position.longitude);
+          _animateToPosition(newLatLng);
+        });
+  }
+
+  Future<void> _animateToPosition(LatLng target) async {
+    if (_controller.isCompleted) {
+      final GoogleMapController mapController = await _controller.future;
+      mapController.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: target, zoom: 17.0, tilt: 30),
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _positionStream?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Bản đồ dẫn đường'), centerTitle: true),
-      body: GoogleMap(
-        initialCameraPosition: CameraPosition(
-          target: _initialPosition,
-          zoom: 14,
-        ),
-        myLocationEnabled: true,
-        myLocationButtonEnabled: true,
-        onMapCreated: (controller) => _mapController = controller,
-      ),
+      body: _initialPosition == null
+          ? const Center(
+              child: CircularProgressIndicator(color: Colors.cyanAccent),
+            )
+          : Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: _initialPosition!,
+                    zoom: 17.0,
+                  ),
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  compassEnabled: true,
+                  trafficEnabled: true,
+                  zoomControlsEnabled: false,
+                  onMapCreated: (GoogleMapController controller) {
+                    if (!_controller.isCompleted) {
+                      _controller.complete(controller);
+                    }
+                  },
+                ),
+              ],
+            ),
     );
   }
 }
