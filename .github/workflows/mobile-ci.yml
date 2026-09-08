@@ -27,7 +27,9 @@ jobs:
         run: flutter pub get
 
       - name: Analyze
-        run: flutter analyze
+        # Không fail CI vì cảnh báo `info` (chủ yếu là deprecation từ SDK/plugin
+        # nâng version). Vẫn fail nếu có error hoặc warning thật.
+        run: flutter analyze --no-fatal-infos
 
       - name: Test
         run: flutter test

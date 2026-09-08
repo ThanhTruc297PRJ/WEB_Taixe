@@ -25,7 +25,7 @@
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAs9EkWptYFe53e9z2_d3sB_4-ZdnB56-w" />
+            android:value="AIzaSyAzPxzc2hlvh_vIgT9W7644zbwO2xoS2gg" />
 
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"

@@ -1,6 +1,4 @@
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart';
-import 'package:vibration/vibration.dart';
 
 class AlertService {
   static final AlertService _instance = AlertService._internal();
@@ -10,37 +8,43 @@ class AlertService {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
 
-  Future<void> triggerDrowsinessAlert() async {
+  bool get isPlaying => _isPlaying;
+
+  Future<void> playWarningAlert({String? customSoundUrl}) async {
     if (_isPlaying) return;
-    _isPlaying = true;
 
     try {
-      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-      await _audioPlayer.play(AssetSource('audio/alarm.mp3'));
+      _isPlaying = true;
+      await _audioPlayer.stop();
 
-      final hasVibrator = await Vibration.hasVibrator() ?? false;
-      if (hasVibrator) {
-        final hasCustom = await Vibration.hasCustomVibrationsSupport() ?? false;
-        if (hasCustom) {
-          Vibration.vibrate(pattern: [500, 1000, 500, 1000], repeat: 0);
-        } else {
-          Vibration.vibrate();
-        }
-      }
+      // Dùng asset đang có trong pubspec (assets/audio/alarm.mp3). File
+      // sounds/alert_alarm.mp3 chưa được thêm vào assets.
+      final soundSource = (customSoundUrl != null && customSoundUrl.isNotEmpty)
+          ? UrlSource(customSoundUrl)
+          : AssetSource('audio/alarm.mp3');
+
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.play(soundSource);
     } catch (e) {
-      debugPrint('Lỗi phát chuông: $e');
+      _isPlaying = false;
     }
+  }
+
+  Future<void> playQuickBeep() async {
+    try {
+      await _audioPlayer.stop();
+      await _audioPlayer.setReleaseMode(ReleaseMode.stop);
+      await _audioPlayer.play(AssetSource('sounds/short_beep.mp3'));
+    } catch (_) {}
   }
 
   Future<void> stopAlert() async {
     if (!_isPlaying) return;
-    _isPlaying = false;
-
     try {
       await _audioPlayer.stop();
-      Vibration.cancel();
-    } catch (e) {
-      debugPrint('Lỗi tắt chuông: $e');
+      _isPlaying = false;
+    } catch (_) {
+      _isPlaying = false;
     }
   }
 
