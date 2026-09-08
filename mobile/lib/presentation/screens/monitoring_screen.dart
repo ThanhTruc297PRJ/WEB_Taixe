@@ -122,11 +122,6 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, color, label) = switch (vm.phase) {
       MonitoringPhase.idle => (Icons.hourglass_empty, Colors.grey, 'Chưa giám sát'),
-      MonitoringPhase.calibrating => (
-          Icons.tune,
-          Colors.blue,
-          'Đang hiệu chỉnh... ${vm.calibrationProgress}/${vm.calibrationTarget}',
-        ),
       MonitoringPhase.monitoring => _monitoringStatus(vm.lastDrowsyProbability, vm.drowsyThreshold),
     };
 

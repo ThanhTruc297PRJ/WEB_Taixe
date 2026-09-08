@@ -1,157 +1,120 @@
+import 'dart:collection';
 import 'dart:math';
 
-import 'baseline_calibrator.dart';
 import 'landmark_feature_service.dart';
 
-/// Tái hiện đúng BUOC 4 của Notebook 2 (aggregate_window) — cửa sổ trượt
-/// [windowSize] mẫu, bước [stepSize] mẫu. Ở đây EAR_z/MAR_z dùng
-/// [EarMarBaseline] hiệu chỉnh đầu phiên thay vì "Alert-only baseline theo
-/// nhãn" (không thể tái tạo lúc chạy thật — xem baseline_calibrator.dart).
+/// Tính 11 đặc trưng cho model **MLP-Feature** — mỗi khung hình đã lấy mẫu
+/// cho ra 1 vector (khác model SVM cũ: không còn cửa sổ trượt 60/15, không
+/// còn baseline cá nhân / EAR_z).
 ///
-/// LƯU Ý ddof (rất dễ làm sai): code train dùng `numpy_array.std()` cho
-/// EAR/MAR/EAR_z/MAR_z/TILT (ddof=0, chia N) nhưng dùng
-/// `pandas_series.std()` riêng cho EAR_vel (ddof=1, chia N-1) — 2 công thức
-/// std KHÁC NHAU trong cùng 1 hàm gốc. Đây có vẻ là chỗ không nhất quán
-/// trong code train, nhưng model đã học trên đúng cách tính đó nên phải
-/// giữ nguyên, không "sửa cho nhất quán".
+/// Khớp CHÍNH XÁC `compute_temporal_features()` trong notebook
+/// tcg-paper.ipynb (CELL 4):
+///   - ROLLING_WINDOW  = 5   (ear/mar/tilt roll mean & std)
+///   - PERCLOS_WINDOW  = 30  (perclos_true, blink_rate)
+///   - EAR_BLINK_THRESH = 0.21  (ngưỡng cố định, mắt "nhắm" khi ear < 0.21)
+///
+/// LƯU Ý:
+///   * `*_roll_std` dùng std MẪU (ddof=1) — đúng như `pandas.Series.std()`.
+///     Khi cửa sổ chỉ có 1 mẫu, pandas trả NaN -> `.fillna(0)` -> ở đây 0.0.
+///   * `blink_rate` đếm sự kiện mắt **MỞ RA** (closed 1 -> 0) trong 30 khung,
+///     không phải số lần nhắm. Drowsy > Alert (theo notebook).
+///   * `mar_diff` = mar[t] - mar[t-1], khung đầu = 0.
 class FeatureWindowAggregator {
   FeatureWindowAggregator({
-    this.windowSize = 60,
-    this.stepSize = 15,
-    this.earBlinkThreshold = -1.0,
-    this.marYawnThreshold = 0.6,
+    this.rollingWindow = 5,
+    this.perclosWindow = 30,
+    this.earBlinkThreshold = 0.21,
   });
 
-  final int windowSize;
-  final int stepSize;
+  final int rollingWindow;
+  final int perclosWindow;
   final double earBlinkThreshold;
-  final double marYawnThreshold;
 
-  final List<RawFrameSignal> _window = [];
-  int _samplesSinceLastEmit = 0;
+  final ListQueue<double> _ear = ListQueue();
+  final ListQueue<double> _mar = ListQueue();
+  final ListQueue<double> _tilt = ListQueue();
+  final ListQueue<double> _closed = ListQueue(); // 0/1, tối đa perclosWindow
+  final ListQueue<double> _opening = ListQueue(); // 0/1, tối đa perclosWindow
 
-  /// Xoá cửa sổ trượt — gọi khi bắt đầu 1 phiên giám sát mới để tránh lẫn dữ
-  /// liệu (EAR/MAR) của phiên trước vào batch feature đầu tiên của phiên mới.
+  double? _prevMar;
+  double? _prevClosed;
+
+  /// Xoá toàn bộ lịch sử — gọi khi bắt đầu phiên mới hoặc sau khi mất khuôn
+  /// mặt quá lâu (gap reset).
   void reset() {
-    _window.clear();
-    _samplesSinceLastEmit = 0;
+    _ear.clear();
+    _mar.clear();
+    _tilt.clear();
+    _closed.clear();
+    _opening.clear();
+    _prevMar = null;
+    _prevClosed = null;
   }
 
-  /// Trả về map tên-feature -> giá trị khi đủ 1 cửa sổ mới (mỗi [stepSize]
-  /// mẫu, sau khi đã tích đủ [windowSize] mẫu đầu tiên); null nếu chưa tới
-  /// lúc emit.
-  Map<String, double>? addSample(RawFrameSignal signal, EarMarBaseline baseline) {
-    _window.add(signal);
-    if (_window.length > windowSize) _window.removeAt(0);
-    _samplesSinceLastEmit++;
+  /// Trả về map 11 đặc trưng cho khung hiện tại. LUÔN trả về giá trị (khác
+  /// bản cũ trả null tới khi đủ cửa sổ) vì model mới dự đoán theo từng khung.
+  Map<String, double> addSample(RawFrameSignal s) {
+    final ear = s.ear;
+    final mar = s.mar;
+    final tilt = s.tilt;
 
-    final windowFull = _window.length == windowSize;
-    if (!windowFull || _samplesSinceLastEmit < stepSize) return null;
+    _push(_ear, ear, rollingWindow);
+    _push(_mar, mar, rollingWindow);
+    _push(_tilt, tilt, rollingWindow);
 
-    _samplesSinceLastEmit = 0;
-    return _aggregate(_window, baseline);
-  }
+    final marDiff = _prevMar == null ? 0.0 : mar - _prevMar!;
+    _prevMar = mar;
 
-  Map<String, double> _aggregate(List<RawFrameSignal> w, EarMarBaseline baseline) {
-    final ear = w.map((s) => s.ear).toList();
-    final mar = w.map((s) => s.mar).toList();
-    final tilt = w.map((s) => s.tilt).toList();
-    final earVel = w.map((s) => s.earVel).toList();
-    final marVel = w.map((s) => s.marVel).toList();
-    final earZ = ear.map(baseline.earZ).toList();
-    final marZ = mar.map(baseline.marZ).toList();
+    final closed = ear < earBlinkThreshold ? 1.0 : 0.0;
+    final opening = (_prevClosed == 1.0 && closed == 0.0) ? 1.0 : 0.0;
+    _prevClosed = closed;
+    _push(_closed, closed, perclosWindow);
+    _push(_opening, opening, perclosWindow);
 
-    final earMean = _mean(ear);
-    final marMean = _mean(mar);
-
-    final isClosed = earZ.map((z) => z < earBlinkThreshold).toList();
-    final isYawning = mar.map((m) => m > marYawnThreshold).toList();
+    final earRollMean = _mean(_ear);
+    final marRollMean = _mean(_mar);
 
     return {
-      'EAR_mean': earMean,
-      'EAR_std': _populationStd(ear),
-      'EAR_min': ear.reduce(min),
-      'EAR_max': ear.reduce(max),
-      'EAR_range': ear.reduce(max) - ear.reduce(min),
-      'MAR_mean': marMean,
-      'MAR_std': _populationStd(mar),
-      'MAR_min': mar.reduce(min),
-      'MAR_max': mar.reduce(max),
-      'MAR_range': mar.reduce(max) - mar.reduce(min),
-      'EAR_z_mean': _mean(earZ),
-      'EAR_z_std': _populationStd(earZ),
-      'EAR_z_min': earZ.reduce(min),
-      'EAR_z_max': earZ.reduce(max),
-      'EAR_z_range': earZ.reduce(max) - earZ.reduce(min),
-      'MAR_z_mean': _mean(marZ),
-      'MAR_z_std': _populationStd(marZ),
-      'TILT_mean': _mean(tilt),
-      'TILT_std': _populationStd(tilt),
-      'PERCLOS': isClosed.where((c) => c).length / w.length,
-      'EAR_slope': _linearSlope(ear),
-      'blink_rate': _countRisingEdges(isClosed).toDouble(),
-      'yawn_count': _countRisingEdges(isYawning).toDouble(),
-      'EAR_vel_mean': _mean(earVel),
-      'EAR_vel_std': _sampleStd(earVel),
-      'MAR_vel_mean': _mean(marVel),
-      'avg_blink_duration': _avgRunLength(isClosed),
-      'EAR_MAR_ratio': earMean / (marMean + 1e-6),
+      'ear': ear,
+      'mar': mar,
+      'ear_roll_mean': earRollMean,
+      'ear_roll_std': _sampleStd(_ear),
+      'mar_roll_mean': marRollMean,
+      'mar_roll_std': _sampleStd(_mar),
+      'mar_diff': marDiff,
+      'ear_mar_ratio_roll': earRollMean / (marRollMean + 1e-6),
+      'perclos_true': _mean(_closed),
+      'blink_rate': _sum(_opening),
+      'head_tilt_roll_std': _sampleStd(_tilt),
     };
   }
 
-  double _mean(List<double> xs) => xs.reduce((a, b) => a + b) / xs.length;
-
-  double _populationStd(List<double> xs) {
-    final m = _mean(xs);
-    final variance = xs.map((x) => (x - m) * (x - m)).reduce((a, b) => a + b) / xs.length;
-    return sqrt(variance);
+  void _push(ListQueue<double> q, double v, int maxLen) {
+    q.addLast(v);
+    if (q.length > maxLen) q.removeFirst();
   }
 
-  double _sampleStd(List<double> xs) {
+  double _mean(Iterable<double> xs) {
+    var sum = 0.0;
+    var n = 0;
+    for (final x in xs) {
+      sum += x;
+      n++;
+    }
+    return n == 0 ? 0.0 : sum / n;
+  }
+
+  double _sum(Iterable<double> xs) => xs.fold(0.0, (a, b) => a + b);
+
+  /// std mẫu (ddof=1). < 2 phần tử -> 0.0 (khớp pandas NaN -> fillna(0)).
+  double _sampleStd(Iterable<double> xsIter) {
+    final xs = xsIter.toList(growable: false);
     if (xs.length < 2) return 0.0;
     final m = _mean(xs);
-    final variance = xs.map((x) => (x - m) * (x - m)).reduce((a, b) => a + b) / (xs.length - 1);
-    return sqrt(variance);
-  }
-
-  double _linearSlope(List<double> arr) {
-    final n = arr.length;
-    if (n < 2) return 0.0;
-    final t = List<double>.generate(n, (i) => i.toDouble());
-    final tMean = _mean(t);
-    final xMean = _mean(arr);
-    var num = 0.0;
-    var den = 0.0;
-    for (var i = 0; i < n; i++) {
-      num += (t[i] - tMean) * (arr[i] - xMean);
-      den += (t[i] - tMean) * (t[i] - tMean);
+    var acc = 0.0;
+    for (final x in xs) {
+      acc += (x - m) * (x - m);
     }
-    return den == 0 ? 0.0 : num / den;
-  }
-
-  int _countRisingEdges(List<bool> xs) {
-    var count = 0;
-    var prev = false;
-    for (final cur in xs) {
-      if (cur && !prev) count++;
-      prev = cur;
-    }
-    return count;
-  }
-
-  double _avgRunLength(List<bool> xs) {
-    final runs = <int>[];
-    var count = 0;
-    for (final c in xs) {
-      if (c) {
-        count++;
-      } else {
-        if (count > 0) runs.add(count);
-        count = 0;
-      }
-    }
-    if (count > 0) runs.add(count);
-    if (runs.isEmpty) return 0.0;
-    return runs.reduce((a, b) => a + b) / runs.length;
+    return sqrt(acc / (xs.length - 1));
   }
 }

@@ -4,58 +4,61 @@ import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detectio
 
 import '../../data/models/event_log.dart';
 import '../../data/repositories/event_log_repository.dart';
+import '../../services/alert_service.dart';
 import '../../services/camera/camera_frame_buffer.dart';
-import '../../services/ml/baseline_calibrator.dart';
 import '../../services/ml/feature_window_aggregator.dart';
 import '../../services/ml/landmark_feature_service.dart';
 import '../../services/ml/tflite_model_service.dart';
 import '../../services/monitoring/monitoring_task_handler.dart';
-import '../../services/alert_service.dart';
 
-enum MonitoringPhase { idle, calibrating, monitoring }
+/// Model MLP-Feature dự đoán theo từng khung + làm mượt EMA, không còn giai
+/// đoạn hiệu chỉnh baseline như model SVM cũ — chỉ còn idle / monitoring.
+enum MonitoringPhase { idle, monitoring }
 
+/// ViewModel điều phối camera + landmark + đặc trưng + model + cảnh báo + log.
+///
+/// Luồng mỗi khung (~6Hz): landmark -> 11 đặc trưng -> model -> EMA
+/// (s = beta*s + (1-beta)*p) -> so threshold -> cảnh báo + ghi log.
 class MonitoringViewModel extends ChangeNotifier {
   MonitoringViewModel({
     CameraFrameBuffer? cameraFrameBuffer,
     LandmarkFeatureService? landmarkFeatureService,
     TFLiteModelService? tfliteModelService,
     EventLogRepository? eventLogRepository,
-    BaselineCalibrator? baselineCalibrator,
     FeatureWindowAggregator? featureWindowAggregator,
-  }) : _cameraFrameBuffer = cameraFrameBuffer ?? CameraFrameBuffer(),
-       _landmarkFeatureService =
-           landmarkFeatureService ?? LandmarkFeatureService(),
-       _tfliteModelService = tfliteModelService ?? TFLiteModelService(),
-       _eventLogRepository = eventLogRepository ?? EventLogRepository(),
-       _baselineCalibrator = baselineCalibrator ?? BaselineCalibrator(),
-       _featureWindowAggregator =
-           featureWindowAggregator ?? FeatureWindowAggregator();
+  })  : _cameraFrameBuffer = cameraFrameBuffer ?? CameraFrameBuffer(),
+        _landmarkFeatureService =
+            landmarkFeatureService ?? LandmarkFeatureService(),
+        _tfliteModelService = tfliteModelService ?? TFLiteModelService(),
+        _eventLogRepository = eventLogRepository ?? EventLogRepository(),
+        _featureWindowAggregator =
+            featureWindowAggregator ?? FeatureWindowAggregator();
 
   final CameraFrameBuffer _cameraFrameBuffer;
   final LandmarkFeatureService _landmarkFeatureService;
   final TFLiteModelService _tfliteModelService;
   final EventLogRepository _eventLogRepository;
-  final BaselineCalibrator _baselineCalibrator;
   final FeatureWindowAggregator _featureWindowAggregator;
 
   final AlertService _alertService = AlertService();
 
+  // ~6Hz: khớp EFF_FPS=6 (SAMPLE_INTERVAL=5 trên video 30fps) lúc train.
   static const _sampleInterval = Duration(milliseconds: 166);
   DateTime? _lastSampleAt;
-
-  EarMarBaseline? _baseline;
 
   static const _statusMinInterval = Duration(milliseconds: 1000);
   DateTime? _lastStatusAt;
 
+  // EMA state cho xác suất đầu ra.
+  double? _smoothedProb;
+  int _framesSinceFace = 0;
+
   MonitoringPhase phase = MonitoringPhase.idle;
-  double? lastDrowsyProbability;
+  double? lastDrowsyProbability; // đã EMA
   List<EventLog> recentLogs = const [];
 
   bool get isMonitoring => phase != MonitoringPhase.idle;
   CameraFrameBuffer get cameraFrameBuffer => _cameraFrameBuffer;
-  int get calibrationProgress => _baselineCalibrator.collected;
-  int get calibrationTarget => _baselineCalibrator.minSamples;
   double get drowsyThreshold => _tfliteModelService.meta?.threshold ?? 0.5;
 
   void initForegroundTask() {
@@ -90,15 +93,16 @@ class MonitoringViewModel extends ChangeNotifier {
       await FlutterForegroundTask.startService(
         serviceId: 100,
         notificationTitle: 'Đang giám sát an toàn lái xe',
-        notificationText: 'Đang hiệu chỉnh...',
+        notificationText: 'Đang phân tích...',
         callback: monitoringTaskCallback,
       );
     }
 
-    _baselineCalibrator.reset();
     _featureWindowAggregator.reset();
-    _baseline = null;
-    phase = MonitoringPhase.calibrating;
+    _smoothedProb = null;
+    _framesSinceFace = 0;
+    lastDrowsyProbability = null;
+    phase = MonitoringPhase.monitoring;
 
     try {
       await _cameraFrameBuffer.start(onFrame: _onFrame);
@@ -122,7 +126,7 @@ class MonitoringViewModel extends ChangeNotifier {
 
     phase = MonitoringPhase.idle;
     lastDrowsyProbability = null;
-    _baseline = null;
+    _smoothedProb = null;
     notifyListeners();
   }
 
@@ -147,43 +151,38 @@ class MonitoringViewModel extends ChangeNotifier {
   }
 
   Future<void> _processFrame(InputImage image, DateTime now) async {
+    if (phase != MonitoringPhase.monitoring) return;
+
     final signal = await _landmarkFeatureService.analyze(image);
+
     if (signal == null) {
+      _framesSinceFace++;
+      final gapReset = _tfliteModelService.meta?.emaGapReset ?? 20;
+      if (_framesSinceFace > gapReset) {
+        _smoothedProb = null;
+        _featureWindowAggregator.reset();
+      }
       _sendStatus('Không phát hiện khuôn mặt');
       return;
     }
-
-    if (phase == MonitoringPhase.calibrating) {
-      _baselineCalibrator.addSample(signal);
-      final progress =
-          '${_baselineCalibrator.collected}/${_baselineCalibrator.minSamples}';
-      _sendStatus('Đang hiệu chỉnh... $progress');
-      notifyListeners();
-
-      if (_baselineCalibrator.isReady) {
-        _baseline = _baselineCalibrator.finish();
-        phase = MonitoringPhase.monitoring;
-        notifyListeners();
-      }
-      return;
-    }
-
-    final baseline = _baseline;
-    if (phase != MonitoringPhase.monitoring || baseline == null) return;
-
-    final features = _featureWindowAggregator.addSample(signal, baseline);
-    if (features == null) return;
+    _framesSinceFace = 0;
 
     if (!_tfliteModelService.isLoaded) {
       _sendStatus('Model chưa sẵn sàng');
       return;
     }
 
-    final probability = _tfliteModelService.predictDrowsyProbability(features);
+    final features = _featureWindowAggregator.addSample(signal);
+    final raw = _tfliteModelService.predictDrowsyProbability(features);
+
+    final beta = _tfliteModelService.meta?.emaBeta ?? 0.7;
+    _smoothedProb =
+        _smoothedProb == null ? raw : beta * _smoothedProb! + (1 - beta) * raw;
+    final probability = _smoothedProb!;
     lastDrowsyProbability = probability;
     notifyListeners();
 
-    final threshold = _tfliteModelService.meta!.threshold;
+    final threshold = _tfliteModelService.meta?.threshold ?? 0.5;
     final isDrowsy = probability >= threshold;
 
     _sendStatus(

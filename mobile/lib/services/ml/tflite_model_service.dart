@@ -3,38 +3,59 @@ import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
-/// Metadata đi kèm model (assets/models/model_meta.json — export từ
-/// model_meta.pkl vì Dart không đọc được pickle của Python).
+/// Metadata đi kèm model (assets/models/model_meta.json — sinh bởi
+/// scripts/convert_mlp_to_tflite.py).
 class DrowsinessModelMeta {
   const DrowsinessModelMeta({
     required this.threshold,
-    required this.windowSize,
-    required this.stepSize,
+    required this.rollingWindow,
+    required this.perclosWindow,
+    required this.earBlinkThreshold,
+    required this.emaBeta,
+    required this.emaGapReset,
     required this.featureCols,
   });
 
+  /// Ngưỡng quyết định trên xác suất (đã EMA): >= threshold -> buồn ngủ.
   final double threshold;
-  final int windowSize;
-  final int stepSize;
+
+  /// Cửa sổ tính *_roll_mean/std (khung hình).
+  final int rollingWindow;
+
+  /// Cửa sổ tính perclos_true / blink_rate (khung hình).
+  final int perclosWindow;
+
+  /// Ngưỡng EAR để coi mắt là "nhắm".
+  final double earBlinkThreshold;
+
+  /// Hệ số làm mượt EMA cho xác suất đầu ra: s = beta*s + (1-beta)*p.
+  final double emaBeta;
+
+  /// Mất khuôn mặt quá số khung này thì reset EMA + lịch sử đặc trưng.
+  final int emaGapReset;
+
   final List<String> featureCols;
 
-  factory DrowsinessModelMeta.fromJson(Map<String, dynamic> json) => DrowsinessModelMeta(
+  factory DrowsinessModelMeta.fromJson(Map<String, dynamic> json) =>
+      DrowsinessModelMeta(
         threshold: (json['threshold'] as num).toDouble(),
-        windowSize: json['window_size'] as int,
-        stepSize: json['step_size'] as int,
+        rollingWindow: (json['rolling_window'] as num).toInt(),
+        perclosWindow: (json['perclos_window'] as num).toInt(),
+        earBlinkThreshold: (json['ear_blink_thresh'] as num).toDouble(),
+        emaBeta: (json['ema_beta'] as num).toDouble(),
+        emaGapReset: (json['ema_gap_reset'] as num).toInt(),
         featureCols: List<String>.from(json['feature_cols'] as List),
       );
 }
 
-/// Model buồn ngủ thật (TASK-A02/SUB-01): pipeline RobustScaler + SVM (RBF,
-/// calibrated) đã train bằng scikit-learn, convert sang .tflite bằng
-/// scripts/convert_svm_to_tflite.py (xem file đó để hiểu vì sao KHÔNG convert
-/// thẳng qua skl2onnx/onnx2tf — model đó không load được bằng runtime chuẩn).
+/// Model buồn ngủ **MLP-Feature**: pipeline StandardScaler + MLP (128-64-32,
+/// relu, sigmoid) train bằng scikit-learn, convert sang .tflite bằng
+/// scripts/convert_mlp_to_tflite.py (đã verify khớp predict_proba gốc, sai
+/// lệch ~1e-7).
 ///
-/// Input: đúng [meta.featureCols.length] giá trị, ĐÚNG THỨ TỰ theo
-/// [meta.featureCols] (28 đặc trưng EAR/MAR/PERCLOS/... tính theo cửa sổ
-/// [meta.windowSize] khung hình). Việc tính ra các đặc trưng này từ
-/// camera/landmark CHƯA được implement — xem MonitoringViewModel.
+/// Input: 11 giá trị ĐÚNG THỨ TỰ theo [meta.featureCols] (xem
+/// FeatureWindowAggregator). Output: xác suất buồn ngủ [0, 1] cho 1 khung —
+/// MonitoringViewModel làm mượt bằng EMA rồi mới so [meta.threshold].
 class TFLiteModelService {
   Interpreter? _interpreter;
   DrowsinessModelMeta? _meta;

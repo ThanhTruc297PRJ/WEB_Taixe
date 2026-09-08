@@ -1,15 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:apphotrotaixe/data/models/event_log.dart';
-import 'package:apphotrotaixe/services/ml/baseline_calibrator.dart';
 import 'package:apphotrotaixe/services/ml/feature_window_aggregator.dart';
 import 'package:apphotrotaixe/services/ml/landmark_feature_service.dart';
 
 // Không test MonitoringScreen/DriverSafetyApp/LandmarkFeatureService trực
 // tiếp ở đây: chúng phụ thuộc camera/sqflite/ML Kit/flutter_foreground_task
 // qua platform channel, vốn không có sẵn trong môi trường `flutter test`
-// thuần Dart. Test phần logic thuần Dart (tính toán feature/baseline) —
-// đây cũng là phần dễ sai nhất vì phải khớp chính xác công thức lúc train.
+// thuần Dart. Test phần logic thuần Dart (tính toán feature) — đây cũng là
+// phần dễ sai nhất vì phải khớp chính xác công thức lúc train.
 void main() {
   group('EventLog', () {
     test('toMap/fromMap round-trip giữ nguyên dữ liệu', () {
@@ -30,86 +29,78 @@ void main() {
     });
   });
 
-  group('BaselineCalibrator', () {
-    test('tính đúng mean/std (population, ddof=0) sau khi đủ mẫu', () {
-      final calibrator = BaselineCalibrator(minSamples: 4);
-      for (final ear in [0.30, 0.10, 0.10, 0.30]) {
-        calibrator.addSample(RawFrameSignal(ear: ear, mar: 0.5, tilt: 0, earVel: 0, marVel: 0));
-      }
+  group('FeatureWindowAggregator (MLP-Feature, 11 đặc trưng)', () {
+    RawFrameSignal sig(double ear, double mar, double tilt) =>
+        RawFrameSignal(ear: ear, mar: mar, tilt: tilt, earVel: 0, marVel: 0);
 
-      expect(calibrator.isReady, isTrue);
-      final baseline = calibrator.finish();
+    test('khung đầu tiên: roll_std = 0 (pandas NaN -> fillna 0)', () {
+      final agg = FeatureWindowAggregator();
+      final f = agg.addSample(sig(0.30, 0.40, 2.0));
 
-      expect(baseline.earMean, closeTo(0.2, 1e-9));
-      expect(baseline.earStd, closeTo(0.1, 1e-9)); // population std, không phải sample std
-      expect(baseline.marMean, closeTo(0.5, 1e-9));
-      expect(baseline.marStd, closeTo(0.0, 1e-9));
+      expect(f['ear'], 0.30);
+      expect(f['mar'], 0.40);
+      expect(f['ear_roll_mean'], closeTo(0.30, 1e-12));
+      expect(f['ear_roll_std'], 0.0);
+      expect(f['mar_roll_std'], 0.0);
+      expect(f['head_tilt_roll_std'], 0.0);
+      expect(f['mar_diff'], 0.0); // không có khung trước
+      expect(f['perclos_true'], 0.0); // ear 0.30 >= 0.21 -> mắt mở
+      expect(f['blink_rate'], 0.0);
     });
 
-    test('earZ/marZ trả về 0 nếu std ~ 0 (tránh chia 0)', () {
-      const baseline = EarMarBaseline(earMean: 0.2, earStd: 0.0, marMean: 0.5, marStd: 0.0);
-      expect(baseline.earZ(0.5), 0.0);
-      expect(baseline.marZ(0.9), 0.0);
-    });
-  });
-
-  group('FeatureWindowAggregator', () {
-    // window=4, step=2: cửa sổ đầu emit ngay khi đủ 4 mẫu (samples[0:4]),
-    // cửa sổ kế tiếp emit sau 2 mẫu mới (samples[2:6]) — khớp cách NB2 tạo
-    // window bằng range(0, n-window+1, step).
-    const baseline = EarMarBaseline(earMean: 0.30, earStd: 0.10, marMean: 0.50, marStd: 0.05);
-
-    List<RawFrameSignal> fourSignals() => [
-          RawFrameSignal(ear: 0.30, mar: 0.5, tilt: 5, earVel: 0.0, marVel: 0),
-          RawFrameSignal(ear: 0.10, mar: 0.5, tilt: 5, earVel: -0.2, marVel: 0),
-          RawFrameSignal(ear: 0.10, mar: 0.5, tilt: 5, earVel: 0.0, marVel: 0),
-          RawFrameSignal(ear: 0.30, mar: 0.5, tilt: 5, earVel: 0.2, marVel: 0),
-        ];
-
-    test('chỉ emit khi đủ window, sau đó emit mỗi step mẫu mới', () {
-      final aggregator = FeatureWindowAggregator(windowSize: 4, stepSize: 2);
-      final emissions = <Map<String, double>?>[];
-      for (final s in [...fourSignals(), ...fourSignals().sublist(0, 2)]) {
-        emissions.add(aggregator.addSample(s, baseline));
+    test('công thức 11 đặc trưng khớp tính tay sau 5 khung', () {
+      final agg = FeatureWindowAggregator();
+      // ear: [.30, .28, .15, .15, .30]  (.15 < 0.21 -> mắt nhắm ở khung 3,4)
+      // mar: [.40, .42, .50, .55, .45]
+      // tilt:[2.0, 2.0, 3.0, 3.0, 2.0]
+      final frames = [
+        sig(0.30, 0.40, 2.0),
+        sig(0.28, 0.42, 2.0),
+        sig(0.15, 0.50, 3.0),
+        sig(0.15, 0.55, 3.0),
+        sig(0.30, 0.45, 2.0),
+      ];
+      Map<String, double>? f;
+      for (final s in frames) {
+        f = agg.addSample(s);
       }
-      // 4 mẫu đầu: null, null, null, <window đầu tiên>
-      expect(emissions.sublist(0, 3), everyElement(isNull));
-      expect(emissions[3], isNotNull);
-      // 2 mẫu tiếp theo: null rồi <window thứ hai>
-      expect(emissions[4], isNull);
-      expect(emissions[5], isNotNull);
+      f = f!;
+
+      expect(f['ear'], 0.30);
+      expect(f['mar'], 0.45);
+      expect(f['ear_roll_mean'], closeTo(0.236, 1e-9));
+      expect(f['ear_roll_std'], closeTo(0.07893034904268446, 1e-12));
+      expect(f['mar_roll_mean'], closeTo(0.464, 1e-9));
+      expect(f['mar_roll_std'], closeTo(0.061073725938409894, 1e-12));
+      expect(f['mar_diff'], closeTo(-0.10, 1e-9)); // 0.45 - 0.55
+      expect(f['ear_mar_ratio_roll'], closeTo(0.5086195934922555, 1e-12));
+      expect(f['perclos_true'], closeTo(0.4, 1e-12)); // 2/5 khung nhắm
+      expect(f['blink_rate'], closeTo(1.0, 1e-12)); // 1 lần mắt mở ra (khung 5)
+      expect(f['head_tilt_roll_std'], closeTo(0.5477225575051661, 1e-12));
     });
 
-    test('công thức feature khớp tính tay cho 1 cửa sổ đã biết trước', () {
-      final aggregator = FeatureWindowAggregator(windowSize: 4, stepSize: 2);
-      Map<String, double>? result;
-      for (final s in fourSignals()) {
-        result = aggregator.addSample(s, baseline);
+    test('cửa sổ roll chỉ giữ 5 khung gần nhất', () {
+      final agg = FeatureWindowAggregator();
+      // 4 khung EAR cao rồi 5 khung EAR = 0.20 -> roll_mean phải = 0.20
+      for (final e in [0.35, 0.35, 0.35, 0.35]) {
+        agg.addSample(sig(e, 0.40, 0.0));
       }
-      expect(result, isNotNull);
-      final f = result!;
+      Map<String, double>? f;
+      for (var i = 0; i < 5; i++) {
+        f = agg.addSample(sig(0.20, 0.40, 0.0));
+      }
+      expect(f!['ear_roll_mean'], closeTo(0.20, 1e-12));
+      expect(f['ear_roll_std'], closeTo(0.0, 1e-12));
+    });
 
-      // ear = [0.30, 0.10, 0.10, 0.30] -> mean=0.2, std population=0.1
-      expect(f['EAR_mean'], closeTo(0.2, 1e-9));
-      expect(f['EAR_std'], closeTo(0.1, 1e-9));
-      expect(f['EAR_range'], closeTo(0.2, 1e-9));
-      expect(f['EAR_slope'], closeTo(0.0, 1e-9)); // đối xứng quanh giữa window
-
-      // earZ = (ear-0.3)/0.1 = [0, -2, -2, 0]; ngưỡng mặc định -1.0
-      // -> isClosed = [F, T, T, F] -> PERCLOS=0.5, 1 lần chuyển F->T,
-      //    1 chuỗi nhắm dài 2 mẫu.
-      expect(f['PERCLOS'], closeTo(0.5, 1e-9));
-      expect(f['blink_rate'], closeTo(1.0, 1e-9));
-      expect(f['avg_blink_duration'], closeTo(2.0, 1e-9));
-
-      // earVel = [0, -0.2, 0, 0.2] -> mean=0, sample std (ddof=1) = sqrt(0.08/3)
-      expect(f['EAR_vel_mean'], closeTo(0.0, 1e-9));
-      expect(f['EAR_vel_std'], closeTo(0.16329931618554522, 1e-9));
-
-      // mar hằng số 0.5 -> MAR_std=0; EAR_MAR_ratio = 0.2/0.500001
-      expect(f['MAR_std'], closeTo(0.0, 1e-9));
-      expect(f['EAR_MAR_ratio'], closeTo(0.2 / 0.500001, 1e-6));
-      expect(f['yawn_count'], closeTo(0.0, 1e-9));
+    test('reset xoá sạch lịch sử', () {
+      final agg = FeatureWindowAggregator();
+      agg.addSample(sig(0.15, 0.60, 1.0)); // mắt nhắm
+      agg.reset();
+      final f = agg.addSample(sig(0.30, 0.40, 2.0));
+      expect(f['perclos_true'], 0.0);
+      expect(f['mar_diff'], 0.0);
+      expect(f['ear_roll_mean'], closeTo(0.30, 1e-12));
     });
   });
 }
