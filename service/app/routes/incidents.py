@@ -29,3 +29,10 @@ def get_incident(incident_id: str):
     if incident is None:
         raise HTTPException(status_code=404, detail="Incident not found")
     return incident
+
+
+@router.delete("/{incident_id}")
+def delete_incident(incident_id: str):
+    if not incident_service.delete_incident(incident_id):
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return {"status": "success"}

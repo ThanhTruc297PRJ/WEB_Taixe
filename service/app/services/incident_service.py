@@ -11,10 +11,15 @@ _INCIDENT_LABELS = {
     "distraction": "Phát hiện mất tập trung",
 }
 
+# Điểm vi phạm mặc định theo loại khi client không gửi kèm.
+_DEFAULT_POINTS = {"drowsiness": 10, "distraction": 5}
+
 
 def create_incident(incident: IncidentCreate) -> dict:
     doc_ref = db.collection(COLLECTION).document()
     data = incident.model_dump()
+    if not data.get("points"):
+        data["points"] = _DEFAULT_POINTS.get(incident.type, 5)
     doc_ref.set(data)
     result = {"id": doc_ref.id, **data}
 
@@ -46,3 +51,11 @@ def list_incidents(driver_id: Optional[str] = None) -> list[dict]:
     if driver_id:
         query = query.where("driver_id", "==", driver_id)
     return [{"id": doc.id, **doc.to_dict()} for doc in query.stream()]
+
+
+def delete_incident(incident_id: str) -> bool:
+    doc_ref = db.collection(COLLECTION).document(incident_id)
+    if not doc_ref.get().exists:
+        return False
+    doc_ref.delete()
+    return True

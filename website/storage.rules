@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Ảnh/clip sự cố: app tài xế ghi qua backend (Admin SDK — bỏ qua rules),
+    // web admin đọc trực tiếp qua URL tải (có download token). Token uuid4
+    // không đoán được nên coi như "unlisted", đủ cho nhu cầu xem trên web.
+    match /incident_snapshots/{file} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /incident_clips/{file} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
