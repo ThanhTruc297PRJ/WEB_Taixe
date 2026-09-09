@@ -85,8 +85,10 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(consent.router)
-app.include_router(drivers.router)
+# self_router trước router: để GET /drivers/me không bị GET /drivers/{driver_id}
+# (admin-gated) bắt mất.
 app.include_router(drivers.self_router)
+app.include_router(drivers.router)
 app.include_router(vehicles.router)
 app.include_router(maintenance.router)
 app.include_router(trips.router)
