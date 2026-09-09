@@ -47,7 +47,11 @@ jobs:
   #                              "Firebase Hosting Admin" role
   deploy:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Chỉ chạy khi đã cấu hình Firebase Hosting: đặt repo variable
+    # DEPLOY_ENABLED=true + các secret VITE_FIREBASE_* / FIREBASE_SERVICE_ACCOUNT.
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
