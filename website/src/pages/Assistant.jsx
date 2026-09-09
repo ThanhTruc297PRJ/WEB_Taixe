@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button, Card, Input, Spin, Tag, Typography, App } from 'antd'
 import { SendOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons'
 import { apiPost } from '../services/api'
+import PageHeader from '../components/PageHeader'
 
 const { Text, Paragraph } = Typography
 
@@ -34,7 +35,10 @@ function Assistant() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-gray-800 mb-4">Trợ lý an toàn</h1>
+      <PageHeader
+        title="Trợ lý an toàn"
+        subtitle="Hỏi nhanh về quy trình xử lý buồn ngủ, mất tập trung, chính sách consent"
+      />
       <Card className="max-w-2xl">
         <div className="flex flex-col gap-4 mb-4 max-h-[420px] overflow-y-auto">
           {messages.length === 0 && (

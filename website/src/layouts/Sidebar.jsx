@@ -1,15 +1,8 @@
 import { Badge, Layout, Menu } from 'antd'
-import {
-  DashboardOutlined,
-  TeamOutlined,
-  CarOutlined,
-  ToolOutlined,
-  WarningOutlined,
-  SettingOutlined,
-  RobotOutlined,
-} from '@ant-design/icons'
+import { SafetyCertificateFilled } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useDriversRealtime } from '../hooks/useDriversRealtime'
+import { NAV_SECTIONS } from './navConfig'
 
 const { Sider } = Layout
 
@@ -18,44 +11,52 @@ function Sidebar({ collapsed }) {
   const location = useLocation()
   const { pendingCount } = useDriversRealtime()
 
-  const menuItems = [
-    { key: '/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan' },
-    {
-      key: '/drivers',
-      icon: <TeamOutlined />,
-      label: (
-        <span className="flex items-center justify-between">
-          Quản lý tài xế
-          {pendingCount > 0 && (
-            <Badge count={pendingCount} size="small" offset={[0, 0]} />
-          )}
-        </span>
-      ),
-    },
-    { key: '/vehicles', icon: <CarOutlined />, label: 'Danh mục xe' },
-    { key: '/maintenance', icon: <ToolOutlined />, label: 'Bảo trì xe' },
-    { key: '/incidents', icon: <WarningOutlined />, label: 'Sự cố' },
-    { key: '/assistant', icon: <RobotOutlined />, label: 'Trợ lý an toàn' },
-    { key: '/settings', icon: <SettingOutlined />, label: 'Cài đặt' },
-  ]
+  const menuItems = NAV_SECTIONS.map((section) => ({
+    key: section.label,
+    type: 'group',
+    label: collapsed ? '' : section.label.toUpperCase(),
+    children: section.items.map((item) => ({
+      key: item.key,
+      icon: item.icon,
+      label:
+        item.key === '/drivers' && pendingCount > 0 ? (
+          <span className="flex items-center justify-between">
+            {item.label}
+            <Badge count={pendingCount} size="small" />
+          </span>
+        ) : (
+          item.label
+        ),
+    })),
+  }))
 
   return (
     <Sider
       trigger={null}
       collapsible
       collapsed={collapsed}
-      theme="dark"
-      width={220}
+      width={232}
+      collapsedWidth={72}
     >
-      <div className="h-16 flex items-center justify-center text-white font-bold text-lg overflow-hidden whitespace-nowrap">
-        {collapsed ? 'DM' : 'Driver Monitor'}
+      <div className="flex h-[60px] items-center gap-2.5 px-4 text-white">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-lg">
+          <SafetyCertificateFilled />
+        </span>
+        {!collapsed && (
+          <div className="overflow-hidden whitespace-nowrap leading-tight">
+            <div className="text-[15px] font-bold">Driver Monitor</div>
+            <div className="text-[11px] text-slate-400">Bảng điều khiển</div>
+          </div>
+        )}
       </div>
+      <div className="mx-3 mb-2 border-t border-white/10" />
       <Menu
         theme="dark"
         mode="inline"
         selectedKeys={[location.pathname]}
         items={menuItems}
         onClick={({ key }) => navigate(key)}
+        style={{ background: 'transparent', borderInlineEnd: 'none' }}
       />
     </Sider>
   )

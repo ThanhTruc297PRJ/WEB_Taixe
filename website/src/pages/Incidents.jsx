@@ -14,6 +14,7 @@ import { ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { listDrivers } from '../services/drivers'
 import { listIncidents } from '../services/incidents'
+import PageHeader from '../components/PageHeader'
 
 const TYPE_META = {
   drowsiness: { label: 'Buồn ngủ', color: 'gold' },
@@ -197,12 +198,15 @@ function Incidents() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h1 className="text-xl font-semibold text-gray-800">Báo cáo sự cố</h1>
-        <Button icon={<ReloadOutlined />} onClick={load}>
-          Làm mới
-        </Button>
-      </div>
+      <PageHeader
+        title="Báo cáo sự cố"
+        subtitle="Lịch sử cảnh báo buồn ngủ, mất tập trung theo tài xế"
+        extra={
+          <Button icon={<ReloadOutlined />} onClick={load}>
+            Làm mới
+          </Button>
+        }
+      />
 
       <MilestoneBar points={totalPoints} />
 

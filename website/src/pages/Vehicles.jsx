@@ -20,6 +20,7 @@ import {
   listVehicles,
   updateVehicle,
 } from '../services/vehicles'
+import PageHeader from '../components/PageHeader'
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Đang chạy' },
@@ -183,12 +184,15 @@ function Vehicles() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h1 className="text-xl font-semibold text-gray-800">Danh mục xe</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Thêm xe
-        </Button>
-      </div>
+      <PageHeader
+        title="Danh mục xe"
+        subtitle="Quản lý đội xe và phân công tài xế"
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Thêm xe
+          </Button>
+        }
+      />
 
       <Space className="mb-4" wrap>
         <Input.Search

@@ -23,6 +23,7 @@ import {
   notifyMaintenance,
   updateMaintenance,
 } from '../services/maintenance'
+import PageHeader from '../components/PageHeader'
 
 const TYPE_OPTIONS = [
   { value: 'oil_change', label: 'Thay dầu' },
@@ -226,14 +227,15 @@ function Maintenance() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h1 className="text-xl font-semibold text-gray-800">
-          Lịch bảo trì xe
-        </h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Thêm lịch bảo trì
-        </Button>
-      </div>
+      <PageHeader
+        title="Lịch bảo trì xe"
+        subtitle="Lên lịch, theo dõi và nhắc bảo trì định kỳ cho đội xe"
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Thêm lịch bảo trì
+          </Button>
+        }
+      />
 
       <Space className="mb-4" wrap>
         <Select

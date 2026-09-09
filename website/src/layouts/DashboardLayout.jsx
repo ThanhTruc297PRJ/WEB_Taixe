@@ -17,15 +17,10 @@ function DashboardLayout() {
           collapsed={collapsed}
           onToggle={() => setCollapsed((prev) => !prev)}
         />
-        <Content
-          style={{
-            margin: 16,
-            padding: 24,
-            background: '#fff',
-            borderRadius: 8,
-          }}
-        >
-          <Outlet />
+        <Content className="p-6">
+          <div className="mx-auto max-w-[1280px]">
+            <Outlet />
+          </div>
         </Content>
       </Layout>
     </Layout>

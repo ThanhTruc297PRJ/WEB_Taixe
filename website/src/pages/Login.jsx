@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Button, Card, Divider, Form, Input, Typography, App, Spin } from 'antd'
-import { LockOutlined, UserOutlined } from '@ant-design/icons'
+import {
+  LockOutlined,
+  UserOutlined,
+  SafetyCertificateFilled,
+} from '@ant-design/icons'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 
@@ -101,17 +105,19 @@ function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
-      <Card className="w-full max-w-sm shadow-lg rounded-2xl">
-        <Title level={3} style={{ textAlign: 'center', marginBottom: 4 }}>
-          Driver Monitoring Admin
-        </Title>
-        <Text
-          type="secondary"
-          style={{ display: 'block', textAlign: 'center', marginBottom: 24 }}
-        >
-          Đăng nhập để tiếp tục
-        </Text>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-6">
+      <Card className="w-full max-w-sm rounded-2xl shadow-2xl">
+        <div className="mb-5 flex flex-col items-center">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-2xl text-white">
+            <SafetyCertificateFilled />
+          </span>
+          <Title level={4} style={{ textAlign: 'center', margin: 0 }}>
+            Driver Monitor
+          </Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            Bảng điều khiển quản trị
+          </Text>
+        </div>
         <Form layout="vertical" onFinish={handleFinish}>
           <Form.Item
             name="email"

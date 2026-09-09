@@ -2,20 +2,23 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   App,
+  Avatar,
   Badge,
   Button,
+  Card,
   Form,
   Input,
   Modal,
   Popconfirm,
-  Select,
+  Segmented,
   Space,
   Table,
   Tag,
   Tooltip,
 } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, SyncOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import PageHeader from '../components/PageHeader'
 import {
   approveDriver,
   createDriver,
@@ -36,6 +39,21 @@ const STATUS_META = {
 }
 
 const STALE_MS = 120_000
+
+const AVATAR_COLORS = ['#2563EB', '#7C3AED', '#0891B2', '#DB2777', '#D97706', '#059669']
+
+function initials(name) {
+  const parts = String(name ?? '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+}
+
+function avatarColor(seed) {
+  const s = String(seed ?? '')
+  let h = 0
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]
+}
 
 function presenceInfo(record) {
   const raw = record.presence ?? 'offline'
@@ -71,6 +89,15 @@ function Drivers() {
     () => (error ? (fallback ?? []) : liveDrivers),
     [error, fallback, liveDrivers],
   )
+
+  const counts = useMemo(() => {
+    const c = { all: rows.length, pending: 0, active: 0, inactive: 0, rejected: 0 }
+    rows.forEach((d) => {
+      const s = d.status ?? 'active'
+      if (c[s] !== undefined) c[s] += 1
+    })
+    return c
+  }, [rows])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -160,9 +187,25 @@ function Drivers() {
   }
 
   const columns = [
-    { title: 'Họ tên', dataIndex: 'name' },
-    { title: 'Số điện thoại', dataIndex: 'phone' },
-    { title: 'Số bằng lái', dataIndex: 'license_number' },
+    {
+      title: 'Tài xế',
+      dataIndex: 'name',
+      render: (name, record) => (
+        <div className="flex items-center gap-3">
+          <Avatar style={{ backgroundColor: avatarColor(record.id || name) }}>
+            {initials(name)}
+          </Avatar>
+          <div className="leading-tight">
+            <div className="font-medium text-slate-800">{name || '(chưa có tên)'}</div>
+            {record.email && (
+              <div className="text-xs text-slate-400">{record.email}</div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    { title: 'Số điện thoại', dataIndex: 'phone', render: (v) => v || '—' },
+    { title: 'Số bằng lái', dataIndex: 'license_number', render: (v) => v || '—' },
     {
       title: 'Ngày đăng ký',
       dataIndex: 'submitted_at',
@@ -185,7 +228,11 @@ function Drivers() {
       render: (value, record) => {
         const st = value ?? 'active'
         const meta = STATUS_META[st] ?? { label: st, color: 'default' }
-        const tag = <Tag color={meta.color}>{meta.label}</Tag>
+        const tag = (
+          <Tag color={meta.color} bordered={false} className="rounded-full px-2.5 py-0.5">
+            {meta.label}
+          </Tag>
+        )
         return st === 'rejected' && record.reject_reason ? (
           <Tooltip title={`Lý do: ${record.reject_reason}`}>{tag}</Tooltip>
         ) : (
@@ -197,6 +244,7 @@ function Drivers() {
       title: '',
       key: 'actions',
       width: 190,
+      align: 'right',
       render: (_, record) => {
         const st = record.status ?? 'active'
         if (st === 'pending') {
@@ -279,14 +327,25 @@ function Drivers() {
     },
   ]
 
+  const segmentedOptions = [
+    { value: 'all', label: `Tất cả (${counts.all})` },
+    { value: 'pending', label: `Chờ duyệt (${counts.pending})` },
+    { value: 'active', label: `Hoạt động (${counts.active})` },
+    { value: 'inactive', label: `Đã khoá (${counts.inactive})` },
+    { value: 'rejected', label: `Từ chối (${counts.rejected})` },
+  ]
+
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h1 className="text-xl font-semibold text-gray-800">Quản lý tài khoản tài xế</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Thêm tài xế
-        </Button>
-      </div>
+      <PageHeader
+        title="Quản lý tài khoản tài xế"
+        subtitle="Duyệt hồ sơ đăng ký, khoá/mở khoá và theo dõi kết nối của tài xế"
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Thêm tài xế
+          </Button>
+        }
+      />
 
       {error ? (
         <Alert
@@ -297,39 +356,56 @@ function Drivers() {
           description="Không nghe được Firestore từ trình duyệt. Trang đang hiển thị dữ liệu tải một lần, sẽ không tự cập nhật."
         />
       ) : (
-        <div className="mb-3 text-xs text-gray-500">
-          <Badge status="processing" text="Đang cập nhật realtime từ Firestore" />
+        <div className="mb-3 flex items-center gap-1.5 text-xs text-slate-400">
+          <SyncOutlined spin />
+          Đang đồng bộ realtime từ Firestore
         </div>
       )}
 
-      <Space className="mb-4" wrap>
-        <Input.Search
-          allowClear
-          placeholder="Tìm theo tên, SĐT, số bằng lái, email"
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ width: 300 }}
+      {counts.pending > 0 && (
+        <Alert
+          className="mb-4"
+          type="info"
+          showIcon
+          message={`Có ${counts.pending} hồ sơ đang chờ bạn duyệt.`}
+          action={
+            statusFilter !== 'pending' && (
+              <Button size="small" type="link" onClick={() => setStatusFilter('pending')}>
+                Xem ngay
+              </Button>
+            )
+          }
         />
-        <Select
-          value={statusFilter}
-          onChange={setStatusFilter}
-          style={{ width: 190 }}
-          options={[
-            { value: 'all', label: 'Tất cả' },
-            { value: 'pending', label: 'Chờ duyệt' },
-            { value: 'active', label: 'Đang hoạt động' },
-            { value: 'inactive', label: 'Đã khoá' },
-            { value: 'rejected', label: 'Đã từ chối' },
-          ]}
-        />
-      </Space>
+      )}
 
-      <Table
-        rowKey="id"
-        loading={loading && !error}
-        columns={columns}
-        dataSource={filtered}
-        pagination={{ pageSize: 10, showSizeChanger: false }}
-      />
+      <Card
+        styles={{ body: { padding: 16 } }}
+        className="mb-4"
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <Input.Search
+            allowClear
+            placeholder="Tìm theo tên, SĐT, số bằng lái, email"
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 320 }}
+          />
+          <Segmented
+            options={segmentedOptions}
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
+        </div>
+      </Card>
+
+      <Card styles={{ body: { padding: 0 } }}>
+        <Table
+          rowKey="id"
+          loading={loading && !error}
+          columns={columns}
+          dataSource={filtered}
+          pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
+        />
+      </Card>
 
       {/* Modal thêm / sửa tài xế (admin tạo tay) */}
       <Modal
