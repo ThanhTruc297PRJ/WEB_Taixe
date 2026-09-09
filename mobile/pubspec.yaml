@@ -35,6 +35,11 @@ dependencies:
   google_maps_flutter: ^2.18.0
   geolocator: ^14.0.2
 
+  # Đăng nhập / đăng ký tài xế (email + mật khẩu). Cấu hình bằng
+  # `flutterfire configure` -> sinh lib/firebase_options.dart.
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+
   # State management (ViewModel layer of MVVM) + DI via widget tree
   provider: ^6.1.2
 

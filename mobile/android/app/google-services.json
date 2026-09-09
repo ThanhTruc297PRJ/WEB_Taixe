@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "241198251709",
+    "project_id": "driver-safety-system-290fe",
+    "storage_bucket": "driver-safety-system-290fe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:241198251709:android:5fab34aaa14bd1e77641d4",
+        "android_client_info": {
+          "package_name": "com.example.apphotrotaixe"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "241198251709-9ob8qjou23d2684nr83rvh19v43sadm0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmLgncVUpkludjxf75doEP5kF3Veu8ZL4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "241198251709-9ob8qjou23d2684nr83rvh19v43sadm0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

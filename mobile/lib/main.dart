@@ -1,14 +1,20 @@
 import 'dart:ui';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:animate_do/animate_do.dart';
 
+import 'firebase_options.dart';
+import 'presentation/viewmodels/auth_view_model.dart';
 import 'presentation/viewmodels/monitoring_view_model.dart';
 import 'presentation/viewmodels/music_view_model.dart';
 import 'presentation/viewmodels/maintenance_view_model.dart';
 
+import 'presentation/screens/auth/login_screen.dart';
+import 'presentation/screens/auth/register_screen.dart';
+import 'presentation/screens/gate/status_screen.dart';
 import 'presentation/screens/monitoring_screen.dart';
 import 'presentation/screens/map_screen.dart';
 import 'presentation/screens/report_screen.dart';
@@ -16,11 +22,15 @@ import 'presentation/screens/maintenance_screen.dart';
 import 'presentation/screens/music_screen.dart';
 import 'presentation/screens/profile_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AuthViewModel()),
         ChangeNotifierProvider(create: (_) => MonitoringViewModel()),
         ChangeNotifierProvider(create: (_) => MusicViewModel()),
         ChangeNotifierProvider(create: (_) => MaintenanceViewModel()),
@@ -46,9 +56,35 @@ class MyApp extends StatelessWidget {
           surface: Color(0xFF151D30),
         ),
       ),
-      home: const MainScreen(),
+      home: const _Gate(),
       debugShowCheckedModeBanner: false,
     );
+  }
+}
+
+/// Cổng vào: chọn màn theo trạng thái đăng nhập + duyệt tài khoản.
+class _Gate extends StatelessWidget {
+  const _Gate();
+
+  @override
+  Widget build(BuildContext context) {
+    final gate = context.watch<AuthViewModel>().gate;
+    switch (gate) {
+      case GateState.loading:
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+      case GateState.login:
+        return const LoginScreen();
+      case GateState.register:
+        return const RegisterScreen(profileOnly: true);
+      case GateState.pending:
+      case GateState.rejected:
+      case GateState.locked:
+        return StatusScreen(state: gate);
+      case GateState.ready:
+        return const MainScreen();
+    }
   }
 }
 

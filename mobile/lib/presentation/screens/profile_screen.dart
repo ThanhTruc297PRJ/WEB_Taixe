@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:provider/provider.dart';
+
+import '../viewmodels/auth_view_model.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final account = context.watch<AuthViewModel>().account;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -58,9 +62,9 @@ class ProfileScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Võ Quyền Anh',
-                      style: TextStyle(
+                    Text(
+                      account?.name ?? 'Tài xế',
+                      style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
@@ -68,7 +72,9 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Tài xế nội bộ • Vina Software',
+                      [account?.phone, account?.licenseNumber]
+                          .where((s) => s != null && s.isNotEmpty)
+                          .join(' • '),
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey.shade600,
@@ -126,7 +132,7 @@ class ProfileScreen extends StatelessWidget {
                     titleColor: Colors.red,
                     iconColor: Colors.red,
                     hideArrow: true,
-                    onTap: () {},
+                    onTap: () => context.read<AuthViewModel>().signOut(),
                   ),
                 ],
               ),
