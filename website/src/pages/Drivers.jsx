@@ -12,26 +12,29 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
 } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import {
+  approveDriver,
   createDriver,
   deleteDriver,
   listDrivers,
+  lockDriver,
+  rejectDriver,
+  unlockDriver,
   updateDriver,
 } from '../services/drivers'
 import { toDate, useDriversRealtime } from '../hooks/useDriversRealtime'
 
-const STATUS_OPTIONS = [
-  { value: 'active', label: 'Đang hoạt động' },
-  { value: 'inactive', label: 'Ngừng hoạt động' },
-]
+const STATUS_META = {
+  pending: { label: 'Chờ duyệt', color: 'gold' },
+  active: { label: 'Đang hoạt động', color: 'green' },
+  inactive: { label: 'Đã khoá', color: 'red' },
+  rejected: { label: 'Đã từ chối', color: 'default' },
+}
 
-const statusLabel = (value) =>
-  STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value
-
-// Coi là mất kết nối nếu app tài xế không báo tín hiệu trong ngần này (app
-// crash không kịp gửi "offline").
 const STALE_MS = 120_000
 
 function presenceInfo(record) {
@@ -52,10 +55,10 @@ function Drivers() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [rejectTarget, setRejectTarget] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
   const [form] = Form.useForm()
 
-  // Realtime hỏng (thường do Firestore rules chưa mở cho client) -> tải 1 lần
-  // qua backend để trang vẫn dùng được.
   useEffect(() => {
     if (!error) return
     message.warning('Không nghe được realtime từ Firestore — dùng dữ liệu tải một lần.')
@@ -71,20 +74,26 @@ function Drivers() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return rows.filter((d) => {
+    const result = rows.filter((d) => {
       const status = d.status ?? 'active'
       if (statusFilter !== 'all' && status !== statusFilter) return false
       if (!q) return true
-      return [d.name, d.phone, d.license_number]
+      return [d.name, d.phone, d.license_number, d.email]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q))
+    })
+    // Chờ duyệt luôn lên đầu để admin thấy ngay.
+    return result.sort((a, b) => {
+      const ap = a.status === 'pending' ? 0 : 1
+      const bp = b.status === 'pending' ? 0 : 1
+      if (ap !== bp) return ap - bp
+      return (a.name ?? '').localeCompare(b.name ?? '', 'vi')
     })
   }, [rows, search, statusFilter])
 
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ status: 'active' })
     setModalOpen(true)
   }
 
@@ -94,7 +103,6 @@ function Drivers() {
       name: record.name,
       phone: record.phone,
       license_number: record.license_number,
-      status: record.status ?? 'active',
     })
     setModalOpen(true)
   }
@@ -112,11 +120,10 @@ function Drivers() {
         await updateDriver(editing.id, values)
         message.success('Đã cập nhật tài xế')
       } else {
-        await createDriver(values)
+        await createDriver({ ...values, status: 'active' })
         message.success('Đã thêm tài xế')
       }
       setModalOpen(false)
-      // Không cần reload: onSnapshot tự đẩy bản ghi mới về.
     } catch (e) {
       message.error(e.message)
     } finally {
@@ -124,10 +131,29 @@ function Drivers() {
     }
   }
 
-  const handleDelete = async (id) => {
+  const act = (fn, okMsg) => async (id) => {
     try {
-      await deleteDriver(id)
-      message.success('Đã xoá tài xế')
+      await fn(id)
+      message.success(okMsg)
+    } catch (e) {
+      message.error(e.message)
+    }
+  }
+  const handleApprove = act(approveDriver, 'Đã duyệt tài khoản')
+  const handleLock = act(lockDriver, 'Đã khoá tài khoản')
+  const handleUnlock = act(unlockDriver, 'Đã mở khoá')
+  const handleDelete = act(deleteDriver, 'Đã xoá')
+
+  const handleReject = async () => {
+    const reason = rejectReason.trim()
+    if (!reason) {
+      message.warning('Nhập lý do từ chối')
+      return
+    }
+    try {
+      await rejectDriver(rejectTarget.id, reason)
+      message.success('Đã từ chối')
+      setRejectTarget(null)
     } catch (e) {
       message.error(e.message)
     }
@@ -137,6 +163,14 @@ function Drivers() {
     { title: 'Họ tên', dataIndex: 'name' },
     { title: 'Số điện thoại', dataIndex: 'phone' },
     { title: 'Số bằng lái', dataIndex: 'license_number' },
+    {
+      title: 'Ngày đăng ký',
+      dataIndex: 'submitted_at',
+      render: (v) => {
+        const d = toDate(v)
+        return d ? dayjs(d).format('DD/MM/YYYY') : '—'
+      },
+    },
     {
       title: 'Kết nối',
       key: 'presence',
@@ -148,26 +182,90 @@ function Drivers() {
     {
       title: 'Trạng thái',
       dataIndex: 'status',
-      render: (value) => {
-        const status = value ?? 'active'
-        return (
-          <Tag color={status === 'active' ? 'green' : 'default'}>
-            {statusLabel(status)}
-          </Tag>
+      render: (value, record) => {
+        const st = value ?? 'active'
+        const meta = STATUS_META[st] ?? { label: st, color: 'default' }
+        const tag = <Tag color={meta.color}>{meta.label}</Tag>
+        return st === 'rejected' && record.reject_reason ? (
+          <Tooltip title={`Lý do: ${record.reject_reason}`}>{tag}</Tooltip>
+        ) : (
+          tag
         )
       },
     },
     {
       title: '',
       key: 'actions',
-      width: 150,
-      render: (_, record) => (
-        <Space>
-          <Button size="small" onClick={() => openEdit(record)}>
-            Sửa
-          </Button>
+      width: 190,
+      render: (_, record) => {
+        const st = record.status ?? 'active'
+        if (st === 'pending') {
+          return (
+            <Space>
+              <Popconfirm
+                title="Duyệt tài khoản này?"
+                okText="Duyệt"
+                cancelText="Huỷ"
+                onConfirm={() => handleApprove(record.id)}
+              >
+                <Button size="small" type="primary">
+                  Duyệt
+                </Button>
+              </Popconfirm>
+              <Button
+                size="small"
+                danger
+                onClick={() => {
+                  setRejectTarget(record)
+                  setRejectReason('')
+                }}
+              >
+                Từ chối
+              </Button>
+            </Space>
+          )
+        }
+        if (st === 'active') {
+          return (
+            <Space>
+              <Button size="small" onClick={() => openEdit(record)}>
+                Sửa
+              </Button>
+              <Popconfirm
+                title="Khoá tài khoản này?"
+                okText="Khoá"
+                cancelText="Huỷ"
+                onConfirm={() => handleLock(record.id)}
+              >
+                <Button size="small" danger>
+                  Khoá
+                </Button>
+              </Popconfirm>
+            </Space>
+          )
+        }
+        if (st === 'inactive') {
+          return (
+            <Space>
+              <Button size="small" type="primary" onClick={() => handleUnlock(record.id)}>
+                Mở khoá
+              </Button>
+              <Popconfirm
+                title="Xoá tài xế này?"
+                okText="Xoá"
+                cancelText="Huỷ"
+                onConfirm={() => handleDelete(record.id)}
+              >
+                <Button size="small" danger>
+                  Xoá
+                </Button>
+              </Popconfirm>
+            </Space>
+          )
+        }
+        return (
           <Popconfirm
-            title="Xoá tài xế này?"
+            title="Xoá hồ sơ này?"
             okText="Xoá"
             cancelText="Huỷ"
             onConfirm={() => handleDelete(record.id)}
@@ -176,15 +274,15 @@ function Drivers() {
               Xoá
             </Button>
           </Popconfirm>
-        </Space>
-      ),
+        )
+      },
     },
   ]
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h1 className="text-xl font-semibold text-gray-800">Quản lý tài xế</h1>
+        <h1 className="text-xl font-semibold text-gray-800">Quản lý tài khoản tài xế</h1>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           Thêm tài xế
         </Button>
@@ -196,7 +294,7 @@ function Drivers() {
           type="warning"
           showIcon
           message="Realtime chưa hoạt động"
-          description="Không nghe được Firestore từ trình duyệt (thường do chưa deploy firestore.rules). Trang đang hiển thị dữ liệu tải một lần, sẽ không tự cập nhật."
+          description="Không nghe được Firestore từ trình duyệt. Trang đang hiển thị dữ liệu tải một lần, sẽ không tự cập nhật."
         />
       ) : (
         <div className="mb-3 text-xs text-gray-500">
@@ -207,17 +305,20 @@ function Drivers() {
       <Space className="mb-4" wrap>
         <Input.Search
           allowClear
-          placeholder="Tìm theo tên, SĐT, số bằng lái"
+          placeholder="Tìm theo tên, SĐT, số bằng lái, email"
           onChange={(e) => setSearch(e.target.value)}
-          style={{ width: 280 }}
+          style={{ width: 300 }}
         />
         <Select
           value={statusFilter}
           onChange={setStatusFilter}
           style={{ width: 190 }}
           options={[
-            { value: 'all', label: 'Tất cả trạng thái' },
-            ...STATUS_OPTIONS,
+            { value: 'all', label: 'Tất cả' },
+            { value: 'pending', label: 'Chờ duyệt' },
+            { value: 'active', label: 'Đang hoạt động' },
+            { value: 'inactive', label: 'Đã khoá' },
+            { value: 'rejected', label: 'Đã từ chối' },
           ]}
         />
       </Space>
@@ -230,6 +331,7 @@ function Drivers() {
         pagination={{ pageSize: 10, showSizeChanger: false }}
       />
 
+      {/* Modal thêm / sửa tài xế (admin tạo tay) */}
       <Modal
         open={modalOpen}
         title={editing ? 'Sửa tài xế' : 'Thêm tài xế'}
@@ -262,10 +364,29 @@ function Drivers() {
           >
             <Input />
           </Form.Item>
-          <Form.Item name="status" label="Trạng thái">
-            <Select options={STATUS_OPTIONS} />
-          </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Modal từ chối */}
+      <Modal
+        open={!!rejectTarget}
+        title={`Từ chối tài khoản: ${rejectTarget?.name ?? ''}`}
+        onOk={handleReject}
+        onCancel={() => setRejectTarget(null)}
+        okText="Từ chối"
+        okButtonProps={{ danger: true }}
+        cancelText="Huỷ"
+        destroyOnHidden
+      >
+        <p className="mb-2 text-sm text-gray-500">
+          Lý do sẽ hiển thị cho tài xế trên app.
+        </p>
+        <Input.TextArea
+          rows={3}
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          placeholder="Ví dụ: Số bằng lái không hợp lệ"
+        />
       </Modal>
     </div>
   )

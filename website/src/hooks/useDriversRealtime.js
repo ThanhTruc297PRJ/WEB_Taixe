@@ -9,6 +9,7 @@ export function useDriversRealtime() {
   const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [pendingCount, setPendingCount] = useState(0)
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -17,6 +18,7 @@ export function useDriversRealtime() {
         const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
         rows.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'vi'))
         setDrivers(rows)
+        setPendingCount(rows.filter((d) => d.status === 'pending').length)
         setError(null)
         setLoading(false)
       },
@@ -28,7 +30,7 @@ export function useDriversRealtime() {
     return unsubscribe
   }, [])
 
-  return { drivers, loading, error }
+  return { drivers, loading, error, pendingCount }
 }
 
 /** Firestore Timestamp | ISO string | null -> Date | null */
