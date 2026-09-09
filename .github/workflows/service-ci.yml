@@ -3,10 +3,10 @@ name: Service CI
 on:
   push:
     branches: [main, develop]
-    paths: ["service/**"]
+    paths: ["service/**", ".github/workflows/service-ci.yml"]
   pull_request:
     branches: [main, develop]
-    paths: ["service/**"]
+    paths: ["service/**", ".github/workflows/service-ci.yml"]
 
 defaults:
   run:
