@@ -32,7 +32,7 @@ async def report_incident(
     if len(data) > _MAX_CLIP_BYTES:
         raise HTTPException(status_code=413, detail="Clip quá lớn")
     try:
-        return incident_service.report_from_driver(
+        incident = incident_service.report_from_driver(
             uid=user["uid"],
             incident_type=type,
             detected_at=detected_at,
@@ -42,6 +42,8 @@ async def report_incident(
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+    await incident_service.broadcast_incident(incident)
+    return incident
 
 
 # ── Web admin ────────────────────────────────────────────────────────────
@@ -51,8 +53,10 @@ def list_incidents(driver_id: Optional[str] = None):
 
 
 @router.post("/")
-def create_incident(incident: IncidentCreate):
-    return incident_service.create_incident(incident)
+async def create_incident(incident: IncidentCreate):
+    result = incident_service.create_incident(incident)
+    await incident_service.broadcast_incident(result)
+    return result
 
 
 @router.get("/{incident_id}")

@@ -6,10 +6,45 @@ from typing import Optional
 from app.core.firebase import bucket, db
 from app.models.incident import IncidentCreate
 from app.services import driver_service, notification_service
+from app.services.websocket_manager import manager
 
 COLLECTION = "incidents"
+ADMIN_ROOM = "admin"
 
 _ALLOWED_TYPES = {"drowsiness", "distraction"}
+
+
+def _severity(points: int) -> str:
+    if points >= 30:
+        return "critical"
+    if points >= 22:
+        return "high"
+    return "medium"
+
+
+async def broadcast_incident(incident: dict) -> None:
+    """Đẩy cảnh báo realtime tới web admin (room 'admin'). Best-effort —
+    lỗi ở đây không được làm hỏng việc tạo incident."""
+    try:
+        driver = driver_service.get_driver(incident.get("driver_id", ""))
+        await manager.broadcast_to_room(
+            ADMIN_ROOM,
+            {
+                "type": "alert",
+                "incident_id": incident.get("id"),
+                "driver_id": incident.get("driver_id"),
+                "driver_name": (driver or {}).get("name"),
+                "alert_type": incident.get("type"),
+                "points": incident.get("points"),
+                "severity": _severity(incident.get("points") or 0),
+                "confidence": incident.get("confidence"),
+                "message": _INCIDENT_LABELS.get(
+                    incident.get("type"), incident.get("type")
+                ),
+            },
+        )
+    except Exception:
+        pass
 
 _INCIDENT_LABELS = {
     "drowsiness": "Phát hiện dấu hiệu buồn ngủ",

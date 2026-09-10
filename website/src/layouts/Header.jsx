@@ -1,4 +1,4 @@
-import { Layout, Badge, Space } from 'antd'
+import { Layout, Badge, Space, Tooltip } from 'antd'
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -10,7 +10,7 @@ import { navTitle } from './navConfig'
 
 const { Header: AntHeader } = Layout
 
-function Header({ collapsed, onToggle }) {
+function Header({ collapsed, onToggle, wsConnected }) {
   const CollapseIcon = collapsed ? MenuUnfoldOutlined : MenuFoldOutlined
   const { pathname } = useLocation()
 
@@ -28,6 +28,22 @@ function Header({ collapsed, onToggle }) {
         </span>
       </div>
       <Space size="large" align="center">
+        <Tooltip
+          title={
+            wsConnected
+              ? 'Đang nhận cảnh báo realtime'
+              : 'Mất kết nối cảnh báo realtime'
+          }
+        >
+          <span className="flex items-center gap-1.5 text-xs text-slate-400">
+            <span
+              className={`inline-block h-2 w-2 rounded-full ${
+                wsConnected ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}
+            />
+            Realtime
+          </span>
+        </Tooltip>
         <Badge dot>
           <BellOutlined className="cursor-pointer text-lg text-slate-500 transition-colors hover:text-slate-800" />
         </Badge>

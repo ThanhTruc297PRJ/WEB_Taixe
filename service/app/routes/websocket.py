@@ -1,12 +1,33 @@
-﻿from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from firebase_admin import auth as firebase_auth
 
 from app.services.websocket_manager import manager
 
 router = APIRouter()
 
+# Room mà web admin lắng nghe cảnh báo realtime. Kết nối vào room này bắt buộc
+# kèm ?token=<Firebase ID token> của tài khoản có claim admin.
+ADMIN_ROOM = "admin"
+
+
+def _is_admin(token: str | None) -> bool:
+    if not token:
+        return False
+    try:
+        claims = firebase_auth.verify_id_token(token, clock_skew_seconds=10)
+    except Exception:
+        return False
+    return claims.get("admin") is True
+
 
 @router.websocket("/ws/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str):
+    if room_id == ADMIN_ROOM and not _is_admin(
+        websocket.query_params.get("token")
+    ):
+        await websocket.close(code=4401, reason="Yêu cầu quyền quản trị")
+        return
+
     await manager.connect(websocket, room_id)
 
     await manager.broadcast_to_room(

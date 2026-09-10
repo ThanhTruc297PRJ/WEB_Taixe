@@ -1,13 +1,69 @@
-import { useState } from 'react'
-import { Layout } from 'antd'
-import { Outlet } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { App, Button, Layout } from 'antd'
+import { WarningFilled } from '@ant-design/icons'
+import { Outlet, useNavigate } from 'react-router-dom'
+import dayjs from 'dayjs'
 import Sidebar from './Sidebar'
 import Header from './Header'
+import { useIncidentAlerts } from '../hooks/useIncidentAlerts'
+import { playAlarm, unlockAudio } from '../services/alertSound'
 
 const { Content } = Layout
 
+const SEVERITY_TEXT = {
+  critical: 'Nghiêm trọng',
+  high: 'Cảnh cáo',
+  medium: 'Cảnh báo',
+}
+
 function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
+  const { notification } = App.useApp()
+  const navigate = useNavigate()
+
+  // Mở khoá âm thanh khi người dùng tương tác lần đầu (trình duyệt chặn autoplay).
+  useEffect(() => {
+    const unlock = () => unlockAudio()
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
+  const handleAlert = useCallback(
+    (alert) => {
+      playAlarm(alert.severity)
+      notification.error({
+        message: `${SEVERITY_TEXT[alert.severity] ?? 'Cảnh báo'}: ${
+          alert.message ?? 'Vi phạm an toàn'
+        }`,
+        description: `${alert.driver_name ?? alert.driver_id ?? 'Tài xế'} · ${dayjs().format(
+          'HH:mm:ss',
+        )} · +${alert.points ?? 0} điểm`,
+        icon: <WarningFilled style={{ color: '#f5222d' }} />,
+        duration: 0,
+        key: alert.incident_id ?? undefined,
+        btn: (
+          <Button
+            type="primary"
+            danger
+            size="small"
+            onClick={() => {
+              notification.destroy(alert.incident_id ?? undefined)
+              navigate('/incidents')
+            }}
+          >
+            Xem chi tiết
+          </Button>
+        ),
+      })
+    },
+    [notification, navigate],
+  )
+
+  const { connected } = useIncidentAlerts(handleAlert)
 
   return (
     <Layout className="min-h-screen">
@@ -16,6 +72,7 @@ function DashboardLayout() {
         <Header
           collapsed={collapsed}
           onToggle={() => setCollapsed((prev) => !prev)}
+          wsConnected={connected}
         />
         <Content className="p-6">
           <div className="mx-auto max-w-[1280px]">
