@@ -30,9 +30,72 @@ class _MusicScreenState extends State<MusicScreen>
     super.dispose();
   }
 
+  void _showNotice(MusicViewModel vm) {
+    final text = vm.notice;
+    if (text == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(text),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      vm.clearNotice();
+    });
+  }
+
+  Future<void> _confirmReport(MusicViewModel vm, SongModel song) async {
+    final reasonCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Báo cáo bài hát'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '“${song.title}” — ${song.artist}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                hintText: 'Lý do (không bắt buộc)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Gửi báo cáo'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await vm.reportTrack(
+        song,
+        reason: reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim(),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final musicVM = context.watch<MusicViewModel>();
+    _showNotice(musicVM);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -52,73 +115,49 @@ class _MusicScreenState extends State<MusicScreen>
                   horizontal: 16,
                   vertical: 8,
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.1),
-                          ),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Tìm bài hát online...',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
-                            ),
-                            prefixIcon: const Icon(
-                              FluentIcons.search_24_regular,
-                              color: Colors.cyanAccent,
-                              size: 20,
-                            ),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(
-                                      FluentIcons.dismiss_20_regular,
-                                      color: Colors.grey,
-                                      size: 18,
-                                    ),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      musicVM.clearSearch();
-                                    },
-                                  )
-                                : null,
-                            border: InputBorder.none,
-                          ),
-                          onSubmitted: (val) {
-                            FocusScope.of(context).unfocus();
-                            _tabController.animateTo(0);
-                            musicVM.searchMusic(val);
-                          },
-                        ),
-                      ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.1),
                     ),
-                    const SizedBox(width: 10),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.cyanAccent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Tìm bài hát...',
+                      hintStyle: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.4),
                       ),
-                      child: IconButton(
-                        icon: const Icon(
-                          FluentIcons.folder_open_24_filled,
-                          color: Colors.cyanAccent,
-                        ),
-                        tooltip: 'Mở bài hát trong máy',
-                        onPressed: () => musicVM.pickLocalAudioFile(),
+                      prefixIcon: const Icon(
+                        FluentIcons.search_24_regular,
+                        color: Colors.cyanAccent,
+                        size: 20,
                       ),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(
+                                FluentIcons.dismiss_20_regular,
+                                color: Colors.grey,
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                _searchController.clear();
+                                musicVM.clearSearch();
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
                     ),
-                  ],
+                    onSubmitted: (val) {
+                      FocusScope.of(context).unfocus();
+                      _tabController.animateTo(0);
+                      musicVM.searchMusic(val);
+                    },
+                  ),
                 ),
               ),
               TabBar(
@@ -175,8 +214,13 @@ class _MusicScreenState extends State<MusicScreen>
             ),
             const SizedBox(height: 12),
             const Text(
-              'Nhập từ khóa tìm kiếm hoặc chọn mở bài hát trong máy',
+              'Nhập từ khoá để tìm bài hát',
               style: TextStyle(color: Colors.white54, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Danh sách nhạc do quản trị viên kiểm duyệt',
+              style: TextStyle(color: Colors.white30, fontSize: 11),
             ),
           ],
         ),
@@ -233,7 +277,7 @@ class _MusicScreenState extends State<MusicScreen>
               ),
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: song.isLocal || song.artworkUrl == null
+                child: song.artworkUrl == null
                     ? Container(
                         width: 44,
                         height: 44,
@@ -302,6 +346,7 @@ class _MusicScreenState extends State<MusicScreen>
                 ],
               ),
               onTap: () => musicVM.playTrack(song),
+              onLongPress: () => _confirmReport(musicVM, song),
             ),
           ),
         );

@@ -7,6 +7,7 @@ import Drivers from '../pages/Drivers'
 import Vehicles from '../pages/Vehicles'
 import Maintenance from '../pages/Maintenance'
 import Incidents from '../pages/Incidents'
+import Music from '../pages/Music'
 import Assistant from '../pages/Assistant'
 import Settings from '../pages/Settings'
 import NotFound from '../pages/NotFound'
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
           { path: 'vehicles', element: <Vehicles /> },
           { path: 'maintenance', element: <Maintenance /> },
           { path: 'incidents', element: <Incidents /> },
+          { path: 'music', element: <Music /> },
           { path: 'assistant', element: <Assistant /> },
           { path: 'settings', element: <Settings /> },
         ],

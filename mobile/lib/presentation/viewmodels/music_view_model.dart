@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:http/http.dart' as http;
-import 'package:file_picker/file_picker.dart';
+
+import '../../services/api_client.dart';
+import '../../services/driver_music_api.dart';
 
 class SongModel {
   final String id;
@@ -10,7 +10,6 @@ class SongModel {
   final String artist;
   final String audioUrl;
   final String? artworkUrl;
-  final bool isLocal;
 
   SongModel({
     required this.id,
@@ -18,58 +17,61 @@ class SongModel {
     required this.artist,
     required this.audioUrl,
     this.artworkUrl,
-    this.isLocal = false,
   });
+
+  factory SongModel.fromJson(Map<String, dynamic> j) => SongModel(
+        id: j['id'].toString(),
+        title: (j['title'] ?? 'Không rõ tiêu đề').toString(),
+        artist: (j['artist'] ?? 'Không rõ ca sĩ').toString(),
+        audioUrl: (j['audioUrl'] ?? '').toString(),
+        artworkUrl: j['artworkUrl']?.toString(),
+      );
 }
 
 class MusicViewModel extends ChangeNotifier {
-  final AudioPlayer _audioPlayer = AudioPlayer();
-
-  SongModel? currentTrack;
-  bool isPlaying = false;
-  bool isLoading = false;
-
-  List<SongModel> searchResults = [];
-  final List<SongModel> favorites = [];
-  final List<SongModel> history = [];
-
-  MusicViewModel() {
+  MusicViewModel({DriverMusicApi? api})
+      : _api = api ?? DriverMusicApi() {
     _audioPlayer.onPlayerComplete.listen((_) {
       isPlaying = false;
       notifyListeners();
     });
   }
 
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  final DriverMusicApi _api;
+
+  SongModel? currentTrack;
+  bool isPlaying = false;
+  bool isLoading = false;
+
+  /// Thông báo ngắn hiển thị cho tài xế (bài bị admin tắt, lỗi mạng...).
+  String? notice;
+
+  List<SongModel> searchResults = [];
+  final List<SongModel> favorites = [];
+  final List<SongModel> history = [];
+
+  void clearNotice() {
+    notice = null;
+    notifyListeners();
+  }
+
   Future<void> searchMusic(String query) async {
     if (query.trim().isEmpty) return;
     isLoading = true;
+    notice = null;
     notifyListeners();
 
     try {
-      final url = Uri.parse(
-        'https://itunes.apple.com/search?term=${Uri.encodeComponent(query)}&media=music&limit=25',
-      );
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List results = data['results'];
-        searchResults = results
-            .where((item) => item['previewUrl'] != null)
-            .map(
-              (item) => SongModel(
-                id: item['trackId'].toString(),
-                title: item['trackName'] ?? 'Không rõ tiêu đề',
-                artist: item['artistName'] ?? 'Không rõ ca sĩ',
-                audioUrl: item['previewUrl'],
-                artworkUrl: item['artworkUrl100'],
-                isLocal: false,
-              ),
-            )
-            .toList();
-      }
+      final items = await _api.search(query);
+      searchResults = items.map(SongModel.fromJson).toList();
+      if (searchResults.isEmpty) notice = 'Không tìm thấy bài hát phù hợp';
+    } on ApiException catch (e) {
+      searchResults = [];
+      notice = e.message;
     } catch (_) {
       searchResults = [];
+      notice = 'Không kết nối được máy chủ nhạc';
     }
 
     isLoading = false;
@@ -81,29 +83,27 @@ class MusicViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> pickLocalAudioFile() async {
-    try {
-      FilePickerResult? result = await FilePicker.pickFiles(
-        type: FileType.audio,
-      );
-
-      if (result != null && result.files.single.path != null) {
-        final file = result.files.single;
-        final localSong = SongModel(
-          id: 'local_${DateTime.now().millisecondsSinceEpoch}',
-          title: file.name.replaceAll('.mp3', ''),
-          artist: 'Bộ nhớ thiết bị',
-          audioUrl: file.path!,
-          isLocal: true,
-        );
-        playTrack(localSong);
-      }
-    } catch (_) {}
-  }
-
   Future<void> playTrack(SongModel track) async {
     if (currentTrack?.id == track.id) {
       togglePlayPause();
+      return;
+    }
+
+    // Xin phép backend trước — bài có thể đã bị admin tắt sau khi tài xế tìm.
+    try {
+      await _api.registerPlay(track.id);
+    } on ApiException catch (e) {
+      notice = e.statusCode == 403
+          ? 'Bài này đã bị quản trị viên tắt'
+          : e.message;
+      favorites.removeWhere((s) => s.id == track.id);
+      searchResults.removeWhere((s) => s.id == track.id);
+      history.removeWhere((s) => s.id == track.id);
+      notifyListeners();
+      return;
+    } catch (_) {
+      notice = 'Không kết nối được máy chủ nhạc';
+      notifyListeners();
       return;
     }
 
@@ -112,11 +112,7 @@ class MusicViewModel extends ChangeNotifier {
     history.insert(0, track);
 
     await _audioPlayer.stop();
-    if (track.isLocal) {
-      await _audioPlayer.play(DeviceFileSource(track.audioUrl));
-    } else {
-      await _audioPlayer.play(UrlSource(track.audioUrl));
-    }
+    await _audioPlayer.play(UrlSource(track.audioUrl));
     isPlaying = true;
     notifyListeners();
   }
@@ -132,15 +128,25 @@ class MusicViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool isFavorite(String songId) {
-    return favorites.any((item) => item.id == songId);
-  }
+  bool isFavorite(String songId) => favorites.any((item) => item.id == songId);
 
   void toggleFavorite(SongModel track) {
     if (isFavorite(track.id)) {
       favorites.removeWhere((item) => item.id == track.id);
     } else {
       favorites.add(track);
+    }
+    notifyListeners();
+  }
+
+  Future<void> reportTrack(SongModel track, {String? reason}) async {
+    try {
+      await _api.report(track.id, reason);
+      notice = 'Đã gửi báo cáo. Cảm ơn bạn.';
+    } on ApiException catch (e) {
+      notice = e.message;
+    } catch (_) {
+      notice = 'Không gửi được báo cáo';
     }
     notifyListeners();
   }

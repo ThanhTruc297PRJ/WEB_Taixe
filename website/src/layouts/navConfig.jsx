@@ -6,6 +6,7 @@ import {
   WarningOutlined,
   SettingOutlined,
   RobotOutlined,
+  CustomerServiceOutlined,
 } from '@ant-design/icons'
 
 // Nguồn dữ liệu điều hướng duy nhất — Sidebar và Header cùng đọc từ đây.
@@ -28,6 +29,11 @@ export const NAV_SECTIONS = [
   {
     label: 'Khác',
     items: [
+      {
+        key: '/music',
+        icon: <CustomerServiceOutlined />,
+        label: 'Quản lý nhạc',
+      },
       { key: '/assistant', icon: <RobotOutlined />, label: 'Trợ lý an toàn' },
       { key: '/settings', icon: <SettingOutlined />, label: 'Cài đặt' },
     ],
