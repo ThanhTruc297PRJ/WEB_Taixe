@@ -12,8 +12,11 @@ import {
 } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { listDrivers } from '../services/drivers'
+import { collection, onSnapshot } from 'firebase/firestore'
+import { db } from '../services/firebase'
 import { listIncidents } from '../services/incidents'
+import { useDrivers } from '../contexts/useDrivers'
+import { toDate } from '../utils/firestore'
 import PageHeader from '../components/PageHeader'
 
 const TYPE_META = {
@@ -104,38 +107,48 @@ function IncidentMedia({ incident }) {
   )
 }
 
+const _ts = (v) => {
+  const d = toDate(v)
+  return d ? d.getTime() : dayjs(v).valueOf() || 0
+}
+
 function Incidents() {
   const { message } = App.useApp()
+  const { drivers } = useDrivers()
   const [rows, setRows] = useState([])
-  const [drivers, setDrivers] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [driverFilter, setDriverFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [selected, setSelected] = useState(null)
 
-  const load = useCallback(async () => {
+  const applyRows = useCallback((list) => {
+    list.sort((a, b) => _ts(b.detected_at) - _ts(a.detected_at))
+    setRows(list)
+    setLoading(false)
+  }, [])
+
+  const reloadOnce = useCallback(async () => {
     setLoading(true)
     try {
-      const [incidentList, driverList] = await Promise.all([
-        listIncidents(),
-        listDrivers(),
-      ])
-      incidentList.sort(
-        (a, b) => dayjs(b.detected_at).valueOf() - dayjs(a.detected_at).valueOf(),
-      )
-      setRows(incidentList)
-      setDrivers(driverList)
+      applyRows(await listIncidents())
     } catch (e) {
       message.error(e.message)
-    } finally {
       setLoading(false)
     }
-  }, [message])
+  }, [applyRows, message])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- nạp dữ liệu 1 lần khi mở trang
-    load()
-  }, [load])
+    // Realtime: sự cố mới (do app tài xế gửi) hiện ngay, không cần Làm mới.
+    const unsub = onSnapshot(
+      collection(db, 'incidents'),
+      (snap) => applyRows(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      () => {
+        // Firestore từ chối (chưa deploy rule 'incidents') -> tải một lần.
+        reloadOnce()
+      },
+    )
+    return unsub
+  }, [applyRows, reloadOnce])
 
   const driverName = useMemo(() => {
     const map = {}
@@ -162,7 +175,7 @@ function Incidents() {
     {
       title: 'Thời gian ghi nhận',
       dataIndex: 'detected_at',
-      render: (d) => dayjs(d).format('DD/MM/YYYY HH:mm'),
+      render: (d) => dayjs(toDate(d) ?? d).format('DD/MM/YYYY HH:mm'),
     },
     {
       title: 'Tài xế',
@@ -202,7 +215,7 @@ function Incidents() {
         title="Báo cáo sự cố"
         subtitle="Lịch sử cảnh báo buồn ngủ, mất tập trung theo tài xế"
         extra={
-          <Button icon={<ReloadOutlined />} onClick={load}>
+          <Button icon={<ReloadOutlined />} onClick={reloadOnce}>
             Làm mới
           </Button>
         }
@@ -260,7 +273,9 @@ function Incidents() {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Thời gian">
-                {dayjs(selected.detected_at).format('DD/MM/YYYY HH:mm:ss')}
+                {dayjs(
+                  toDate(selected.detected_at) ?? selected.detected_at,
+                ).format('DD/MM/YYYY HH:mm:ss')}
               </Descriptions.Item>
               <Descriptions.Item label="Điểm vi phạm">
                 {selected.points ?? 0}

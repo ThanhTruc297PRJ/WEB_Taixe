@@ -29,6 +29,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /incidents/{incidentId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Mặc định chặn hết phần còn lại.
     match /{document=**} {
       allow read, write: if false;

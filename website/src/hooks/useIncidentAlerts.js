@@ -5,10 +5,11 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 const WS_URL = `${API_BASE.replace(/^http/, 'ws')}/ws/admin`
 
 const PING_MS = 25_000
-const RECONNECT_MS = 5_000
+const RECONNECT_MIN_MS = 3_000
+const RECONNECT_MAX_MS = 30_000
 
 /** Kết nối WebSocket tới service, gọi `onAlert(payload)` mỗi khi có tài xế
- * vượt ngưỡng buồn ngủ. Tự ping giữ kết nối + tự kết nối lại khi rớt. */
+ * vượt ngưỡng buồn ngủ. Tự ping giữ kết nối + tự kết nối lại (backoff) khi rớt. */
 export function useIncidentAlerts(onAlert) {
   const [connected, setConnected] = useState(false)
   const cbRef = useRef(onAlert)
@@ -22,6 +23,7 @@ export function useIncidentAlerts(onAlert) {
     let pingTimer = null
     let reconnectTimer = null
     let closedByUs = false
+    let retryMs = RECONNECT_MIN_MS
 
     const cleanup = () => {
       clearInterval(pingTimer)
@@ -36,17 +38,24 @@ export function useIncidentAlerts(onAlert) {
       }
     }
 
+    const scheduleReconnect = () => {
+      if (closedByUs) return
+      reconnectTimer = setTimeout(connect, retryMs)
+      // Backoff: 3s -> 6s -> 12s -> 24s -> 30s (trần), tránh spam khi server sập.
+      retryMs = Math.min(retryMs * 2, RECONNECT_MAX_MS)
+    }
+
     const connect = async () => {
       const user = auth.currentUser
       if (!user) {
-        reconnectTimer = setTimeout(connect, RECONNECT_MS)
+        scheduleReconnect()
         return
       }
       let token
       try {
         token = await user.getIdToken()
       } catch {
-        reconnectTimer = setTimeout(connect, RECONNECT_MS)
+        scheduleReconnect()
         return
       }
       if (closedByUs) return
@@ -54,6 +63,7 @@ export function useIncidentAlerts(onAlert) {
       ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`)
 
       ws.onopen = () => {
+        retryMs = RECONNECT_MIN_MS // kết nối lại được -> reset backoff
         setConnected(true)
         pingTimer = setInterval(() => {
           if (ws?.readyState === WebSocket.OPEN) {
@@ -75,7 +85,7 @@ export function useIncidentAlerts(onAlert) {
       ws.onclose = () => {
         setConnected(false)
         clearInterval(pingTimer)
-        if (!closedByUs) reconnectTimer = setTimeout(connect, RECONNECT_MS)
+        scheduleReconnect()
       }
 
       ws.onerror = () => {

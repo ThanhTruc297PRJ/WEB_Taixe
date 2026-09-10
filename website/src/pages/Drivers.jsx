@@ -29,7 +29,8 @@ import {
   unlockDriver,
   updateDriver,
 } from '../services/drivers'
-import { toDate, useDriversRealtime } from '../hooks/useDriversRealtime'
+import { useDrivers } from '../contexts/useDrivers'
+import { toDate } from '../utils/firestore'
 
 const STATUS_META = {
   pending: { label: 'Chờ duyệt', color: 'gold' },
@@ -66,7 +67,7 @@ function presenceInfo(record) {
 
 function Drivers() {
   const { message } = App.useApp()
-  const { drivers: liveDrivers, loading, error } = useDriversRealtime()
+  const { drivers: liveDrivers, loading, error } = useDrivers()
   const [fallback, setFallback] = useState(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')

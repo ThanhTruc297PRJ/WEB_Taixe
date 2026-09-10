@@ -125,6 +125,32 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Trong lúc quay clip sự cố (10s) camera không nhận diện — báo cho tài xế biết.
+    if (vm.capturingIncident) {
+      return Card(
+        color: Colors.orange.withValues(alpha: 0.15),
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.orange,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text('Đang ghi lại video sự cố (10 giây)...'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     // Model MLP-Feature bỏ giai đoạn hiệu chỉnh baseline -> chỉ còn idle /
     // monitoring (xem MonitoringViewModel).
     final (icon, color, label) = switch (vm.phase) {

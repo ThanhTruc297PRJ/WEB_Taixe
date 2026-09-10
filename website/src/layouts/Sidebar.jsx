@@ -1,7 +1,7 @@
 import { Badge, Layout, Menu } from 'antd'
 import { SafetyCertificateFilled } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useDriversRealtime } from '../hooks/useDriversRealtime'
+import { useDrivers } from '../contexts/useDrivers'
 import { NAV_SECTIONS } from './navConfig'
 
 const { Sider } = Layout
@@ -9,7 +9,7 @@ const { Sider } = Layout
 function Sidebar({ collapsed }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { pendingCount } = useDriversRealtime()
+  const { pendingCount } = useDrivers()
 
   const menuItems = NAV_SECTIONS.map((section) => ({
     key: section.label,

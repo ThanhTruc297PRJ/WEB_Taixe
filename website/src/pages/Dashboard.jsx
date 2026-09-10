@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
-import { useDriversRealtime } from '../hooks/useDriversRealtime'
+import { useDrivers } from '../contexts/useDrivers'
 
 const TONES = {
   blue: 'bg-blue-50 text-blue-600',
@@ -43,7 +43,7 @@ function StatCard({ icon, label, value, tone = 'blue', onClick }) {
 
 function Dashboard() {
   const navigate = useNavigate()
-  const { drivers, loading } = useDriversRealtime()
+  const { drivers, loading } = useDrivers()
 
   const stats = useMemo(() => {
     const by = (s) => drivers.filter((d) => (d.status ?? 'active') === s).length

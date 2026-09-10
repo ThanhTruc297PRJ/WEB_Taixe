@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { App, Button, Layout } from 'antd'
+import { Suspense, useCallback, useEffect, useState } from 'react'
+import { App, Button, Layout, Spin } from 'antd'
 import { WarningFilled } from '@ant-design/icons'
 import { Outlet, useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -7,6 +7,7 @@ import Sidebar from './Sidebar'
 import Header from './Header'
 import { useIncidentAlerts } from '../hooks/useIncidentAlerts'
 import { playAlarm, unlockAudio } from '../services/alertSound'
+import { DriversProvider } from '../contexts/DriversContext'
 
 const { Content } = Layout
 
@@ -66,21 +67,31 @@ function DashboardLayout() {
   const { connected } = useIncidentAlerts(handleAlert)
 
   return (
-    <Layout className="min-h-screen">
-      <Sidebar collapsed={collapsed} />
-      <Layout>
-        <Header
-          collapsed={collapsed}
-          onToggle={() => setCollapsed((prev) => !prev)}
-          wsConnected={connected}
-        />
-        <Content className="p-6">
-          <div className="mx-auto max-w-[1280px]">
-            <Outlet />
-          </div>
-        </Content>
+    <DriversProvider>
+      <Layout className="min-h-screen">
+        <Sidebar collapsed={collapsed} />
+        <Layout>
+          <Header
+            collapsed={collapsed}
+            onToggle={() => setCollapsed((prev) => !prev)}
+            wsConnected={connected}
+          />
+          <Content className="p-6">
+            <div className="mx-auto max-w-[1280px]">
+              <Suspense
+                fallback={
+                  <div className="flex justify-center pt-24">
+                    <Spin size="large" />
+                  </div>
+                }
+              >
+                <Outlet />
+              </Suspense>
+            </div>
+          </Content>
+        </Layout>
       </Layout>
-    </Layout>
+    </DriversProvider>
   )
 }
 
