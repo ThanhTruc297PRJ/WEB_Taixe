@@ -13,10 +13,12 @@ import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detectio
 /// `camera` với ML Kit.
 class CameraFrameBuffer {
   CameraController? _controller;
+  CameraDescription? _camera;
   bool _isStreaming = false;
 
   CameraController? get controller => _controller;
   bool get isReady => _controller?.value.isInitialized ?? false;
+  bool get isStreaming => _isStreaming;
 
   Future<void> start({
     required void Function(InputImage image) onFrame,
@@ -27,6 +29,7 @@ class CameraFrameBuffer {
       (c) => c.lensDirection == lensDirection,
       orElse: () => cameras.first,
     );
+    _camera = camera;
 
     final controller = CameraController(
       camera,
@@ -38,20 +41,66 @@ class CameraFrameBuffer {
     _controller = controller;
 
     await controller.initialize();
-    await controller.startImageStream((image) {
+    await _startStream(onFrame);
+  }
+
+  Future<void> _startStream(void Function(InputImage image) onFrame) async {
+    final camera = _camera;
+    if (camera == null) return;
+    await _controller!.startImageStream((image) {
       final inputImage = _toInputImage(image, camera);
       if (inputImage != null) onFrame(inputImage);
     });
     _isStreaming = true;
   }
 
+  /// Quay 1 clip [duration] giây, trả đường dẫn file .mp4. `camera` không cho
+  /// vừa stream frame vừa quay nên phải tạm dừng stream; gọi [resumeStream]
+  /// sau đó để nhận diện tiếp. Trả null nếu camera chưa sẵn sàng / lỗi.
+  Future<String?> recordClip(Duration duration) async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || c.value.isRecordingVideo) {
+      return null;
+    }
+    try {
+      if (_isStreaming) {
+        await c.stopImageStream();
+        _isStreaming = false;
+      }
+      await c.startVideoRecording();
+      await Future.delayed(duration);
+      final file = await c.stopVideoRecording();
+      return file.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Bật lại stream frame sau khi quay clip xong.
+  Future<void> resumeStream({
+    required void Function(InputImage image) onFrame,
+  }) async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || _isStreaming) return;
+    await _startStream(onFrame);
+  }
+
   Future<void> stop() async {
+    final c = _controller;
+    try {
+      if (c != null && c.value.isRecordingVideo) {
+        await c.stopVideoRecording();
+      }
+    } catch (_) {}
     if (_isStreaming) {
-      await _controller?.stopImageStream();
+      try {
+        await c?.stopImageStream();
+      } catch (_) {}
       _isStreaming = false;
     }
-    await _controller?.dispose();
+    await c?.dispose();
     _controller = null;
+    _camera = null;
   }
 
   InputImage? _toInputImage(CameraImage image, CameraDescription camera) {

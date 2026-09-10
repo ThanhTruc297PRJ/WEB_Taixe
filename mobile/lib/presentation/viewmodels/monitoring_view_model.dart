@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detection.dart';
@@ -6,6 +9,7 @@ import '../../data/models/event_log.dart';
 import '../../data/repositories/event_log_repository.dart';
 import '../../services/alert_service.dart';
 import '../../services/camera/camera_frame_buffer.dart';
+import '../../services/incident_api.dart';
 import '../../services/ml/feature_window_aggregator.dart';
 import '../../services/ml/landmark_feature_service.dart';
 import '../../services/ml/tflite_model_service.dart';
@@ -26,21 +30,32 @@ class MonitoringViewModel extends ChangeNotifier {
     TFLiteModelService? tfliteModelService,
     EventLogRepository? eventLogRepository,
     FeatureWindowAggregator? featureWindowAggregator,
+    IncidentApi? incidentApi,
   })  : _cameraFrameBuffer = cameraFrameBuffer ?? CameraFrameBuffer(),
         _landmarkFeatureService =
             landmarkFeatureService ?? LandmarkFeatureService(),
         _tfliteModelService = tfliteModelService ?? TFLiteModelService(),
         _eventLogRepository = eventLogRepository ?? EventLogRepository(),
         _featureWindowAggregator =
-            featureWindowAggregator ?? FeatureWindowAggregator();
+            featureWindowAggregator ?? FeatureWindowAggregator(),
+        _incidentApi = incidentApi ?? IncidentApi();
 
   final CameraFrameBuffer _cameraFrameBuffer;
   final LandmarkFeatureService _landmarkFeatureService;
   final TFLiteModelService _tfliteModelService;
   final EventLogRepository _eventLogRepository;
   final FeatureWindowAggregator _featureWindowAggregator;
+  final IncidentApi _incidentApi;
 
   final AlertService _alertService = AlertService();
+
+  // Sự cố: quay [_clipDuration] giây từ lúc phát hiện, tối đa 1 clip mỗi
+  // [_incidentCooldown] (tài xế buồn ngủ liên tục không đẻ ra hàng loạt clip).
+  static const _clipDuration = Duration(seconds: 10);
+  static const _incidentCooldown = Duration(seconds: 60);
+  DateTime? _lastIncidentAt;
+  bool _capturingIncident = false;
+  bool get capturingIncident => _capturingIncident;
 
   // ~6Hz: khớp EFF_FPS=6 (SAMPLE_INTERVAL=5 trên video 30fps) lúc train.
   static const _sampleInterval = Duration(milliseconds: 166);
@@ -101,6 +116,7 @@ class MonitoringViewModel extends ChangeNotifier {
     _featureWindowAggregator.reset();
     _smoothedProb = null;
     _framesSinceFace = 0;
+    _lastIncidentAt = null;
     lastDrowsyProbability = null;
     phase = MonitoringPhase.monitoring;
 
@@ -204,9 +220,58 @@ class MonitoringViewModel extends ChangeNotifier {
       );
       recentLogs = [log, ...recentLogs].take(50).toList();
       notifyListeners();
+
+      unawaited(_maybeCaptureIncident(probability, now));
     } else {
       _alertService.stopAlert();
     }
+  }
+
+  /// Quay 10s từ lúc phát hiện buồn ngủ rồi gửi lên backend. Chạy nền, không
+  /// chặn vòng nhận diện; có cooldown để không gửi dồn dập.
+  Future<void> _maybeCaptureIncident(double confidence, DateTime at) async {
+    if (_capturingIncident) return;
+    if (_lastIncidentAt != null &&
+        at.difference(_lastIncidentAt!) < _incidentCooldown) {
+      return;
+    }
+    _capturingIncident = true;
+    _lastIncidentAt = at;
+    notifyListeners();
+
+    String? clipPath;
+    try {
+      _sendStatus('Đang ghi lại video sự cố...');
+      clipPath = await _cameraFrameBuffer.recordClip(_clipDuration);
+    } catch (_) {
+      clipPath = null;
+    } finally {
+      // Luôn bật lại stream để nhận diện tiếp, kể cả khi quay lỗi.
+      try {
+        await _cameraFrameBuffer.resumeStream(onFrame: _onFrame);
+      } catch (_) {}
+    }
+
+    if (clipPath != null && phase == MonitoringPhase.monitoring) {
+      try {
+        await _incidentApi.reportDrowsiness(
+          clip: File(clipPath),
+          detectedAt: at,
+          confidence: confidence,
+        );
+      } catch (_) {
+        // best-effort: mất mạng thì bỏ qua, không làm phiền tài xế đang lái.
+      }
+    }
+    try {
+      if (clipPath != null) {
+        final f = File(clipPath);
+        if (await f.exists()) await f.delete();
+      }
+    } catch (_) {}
+
+    _capturingIncident = false;
+    notifyListeners();
   }
 
   Future<void> loadRecentLogs() async {
