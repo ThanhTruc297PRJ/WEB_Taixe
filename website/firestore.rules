@@ -34,6 +34,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /kb_documents/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /chat_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Mặc định chặn hết phần còn lại.
     match /{document=**} {
       allow read, write: if false;

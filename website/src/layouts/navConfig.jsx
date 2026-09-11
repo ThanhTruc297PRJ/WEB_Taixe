@@ -34,7 +34,7 @@ export const NAV_SECTIONS = [
         icon: <CustomerServiceOutlined />,
         label: 'Quản lý nhạc',
       },
-      { key: '/assistant', icon: <RobotOutlined />, label: 'Trợ lý an toàn' },
+      { key: '/assistant', icon: <RobotOutlined />, label: 'Trợ lý AI' },
       { key: '/settings', icon: <SettingOutlined />, label: 'Cài đặt' },
     ],
   },

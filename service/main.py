@@ -17,6 +17,7 @@ from app.routes import (
     consent,
     drivers,
     incidents,
+    kb,
     maintenance,
     music,
     sync,
@@ -96,6 +97,7 @@ app.include_router(trips.router)
 app.include_router(incidents.self_router)
 app.include_router(incidents.router)
 app.include_router(assistant.router)
+app.include_router(kb.router)
 app.include_router(music.self_router)
 app.include_router(music.router)
 app.include_router(websocket.router)
