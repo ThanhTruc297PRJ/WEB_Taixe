@@ -12,6 +12,7 @@ const Dashboard = lazy(() => import('../pages/Dashboard'))
 const Drivers = lazy(() => import('../pages/Drivers'))
 const Vehicles = lazy(() => import('../pages/Vehicles'))
 const Maintenance = lazy(() => import('../pages/Maintenance'))
+const Inspections = lazy(() => import('../pages/Inspections'))
 const Incidents = lazy(() => import('../pages/Incidents'))
 const Music = lazy(() => import('../pages/Music'))
 const Assistant = lazy(() => import('../pages/Assistant'))
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
           { path: 'drivers', element: <Drivers /> },
           { path: 'vehicles', element: <Vehicles /> },
           { path: 'maintenance', element: <Maintenance /> },
+          { path: 'inspections', element: <Inspections /> },
           { path: 'incidents', element: <Incidents /> },
           { path: 'music', element: <Music /> },
           { path: 'assistant', element: <Assistant /> },

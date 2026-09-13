@@ -7,6 +7,7 @@ import {
   SettingOutlined,
   RobotOutlined,
   CustomerServiceOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 
 // Nguồn dữ liệu điều hướng duy nhất — Sidebar và Header cùng đọc từ đây.
@@ -24,6 +25,11 @@ export const NAV_SECTIONS = [
     items: [
       { key: '/vehicles', icon: <CarOutlined />, label: 'Danh mục xe' },
       { key: '/maintenance', icon: <ToolOutlined />, label: 'Bảo trì xe' },
+      {
+        key: '/inspections',
+        icon: <SafetyCertificateOutlined />,
+        label: 'Đăng kiểm xe',
+      },
     ],
   },
   {

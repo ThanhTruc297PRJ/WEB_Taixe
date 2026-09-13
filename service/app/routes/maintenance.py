@@ -4,13 +4,20 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.security import get_current_admin
 from app.models.maintenance import MaintenanceCreate
-from app.services import maintenance_service
+from app.services import maintenance_service, reminder_scheduler
 
 router = APIRouter(
     prefix="/maintenance",
     tags=["maintenance"],
     dependencies=[Depends(get_current_admin)],
 )
+
+
+@router.post("/scan-reminders")
+def scan_reminders():
+    """Quét + gửi nhắc bảo trì/đăng kiểm NGAY, không chờ chu kỳ nền — dùng để
+    demo/kiểm thử nhắc tự động (TASK-C10)."""
+    return reminder_scheduler.run_scan_once()
 
 
 @router.get("/")

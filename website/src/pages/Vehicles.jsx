@@ -100,6 +100,7 @@ function Vehicles() {
       year: record.year ?? null,
       status: record.status ?? 'active',
       driver_id: record.driver_id ?? null,
+      current_odometer_km: record.current_odometer_km ?? null,
       note: record.note ?? '',
     })
     setModalOpen(true)
@@ -145,6 +146,11 @@ function Vehicles() {
     { title: 'Hãng', dataIndex: 'brand' },
     { title: 'Dòng xe', dataIndex: 'model' },
     { title: 'Năm SX', dataIndex: 'year', render: (y) => y || '—' },
+    {
+      title: 'Số km hiện tại',
+      dataIndex: 'current_odometer_km',
+      render: (v) => (v == null ? '—' : `${v.toLocaleString('vi-VN')} km`),
+    },
     {
       title: 'Tài xế phụ trách',
       dataIndex: 'driver_id',
@@ -254,6 +260,13 @@ function Vehicles() {
           </Form.Item>
           <Form.Item name="year" label="Năm sản xuất">
             <InputNumber min={1980} max={2100} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="current_odometer_km"
+            label="Số km hiện tại (đồng hồ công-tơ-mét)"
+            tooltip="Dùng để hệ thống tự nhắc bảo trì/đăng kiểm khi xe gần tới hạn theo km"
+          >
+            <InputNumber min={0} style={{ width: '100%' }} addonAfter="km" />
           </Form.Item>
           <Form.Item name="driver_id" label="Tài xế phụ trách">
             <Select
