@@ -149,10 +149,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       : const Text('Gửi đăng ký'),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Hồ sơ sẽ được quản trị viên duyệt trước khi dùng.',
+                Text(
+                  widget.profileOnly
+                      ? 'Hồ sơ sẽ được quản trị viên duyệt trước khi dùng.'
+                      : 'Sau khi gửi, kiểm tra email để xác thực, rồi chờ '
+                          'quản trị viên duyệt trước khi dùng.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
                 ),
               ],
             ),

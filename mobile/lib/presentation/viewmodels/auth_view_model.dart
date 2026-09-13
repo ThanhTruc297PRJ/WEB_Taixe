@@ -12,7 +12,8 @@ enum GateState {
   loading, // đang kiểm tra
   login, // chưa đăng nhập
   register, // đã đăng nhập nhưng chưa có hồ sơ tài xế
-  pending, // hồ sơ chờ duyệt
+  emailUnverified, // đã gửi hồ sơ nhưng chưa bấm link xác thực email
+  pending, // đã xác thực email, chờ admin duyệt
   rejected, // hồ sơ bị từ chối
   locked, // tài khoản bị khoá
   ready, // đã duyệt -> vào app
@@ -50,6 +51,13 @@ class AuthViewModel extends ChangeNotifier {
   Future<void> refreshAccount({bool force = false}) async {
     _set(GateState.loading);
     try {
+      if (force) {
+        // Cập nhật cờ emailVerified cục bộ ngay nếu tài xế vừa bấm link xác
+        // thực rồi quay lại app — nguồn sự thật vẫn là backend bên dưới.
+        try {
+          await _auth.reloadCurrentUser();
+        } catch (_) {}
+      }
       account = await _driverApi.me(forceRefresh: force);
       _set(_gateFor(account));
     } on ApiException catch (e) {
@@ -68,6 +76,9 @@ class AuthViewModel extends ChangeNotifier {
 
   GateState _gateFor(DriverAccount? acc) {
     if (acc == null) return GateState.register;
+    // Xác thực email trước, bất kể trạng thái hồ sơ — đúng thứ tự đăng ký ->
+    // xác thực -> (mới) admin duyệt.
+    if (!acc.emailVerified) return GateState.emailUnverified;
     switch (acc.status) {
       case DriverAccountStatus.active:
         return GateState.ready;
@@ -87,7 +98,7 @@ class AuthViewModel extends ChangeNotifier {
         await _auth.signIn(email, password);
       });
 
-  /// Đăng ký mới: tạo tài khoản Firebase + gửi hồ sơ tài xế.
+  /// Đăng ký mới: tạo tài khoản Firebase + gửi email xác thực + gửi hồ sơ.
   Future<bool> signUpAndRegister({
     required String email,
     required String password,
@@ -97,6 +108,9 @@ class AuthViewModel extends ChangeNotifier {
   }) =>
       _run(() async {
         await _auth.signUp(email, password);
+        // Firebase tự gửi email kèm link xác thực — miễn phí, không cần
+        // backend. Tài xế phải bấm link này trước khi admin duyệt được.
+        await _auth.sendEmailVerification();
         await _driverApi.register(
           name: name,
           phone: phone,
@@ -104,6 +118,11 @@ class AuthViewModel extends ChangeNotifier {
         );
         await refreshAccount();
       });
+
+  /// Gửi lại email xác thực (màn "Chưa xác thực email" gọi khi tài xế bấm
+  /// "Gửi lại"). Firebase tự giới hạn tần suất gọi liên tục.
+  Future<bool> resendVerificationEmail() =>
+      _run(() => _auth.sendEmailVerification());
 
   /// Đã đăng nhập nhưng thiếu hồ sơ -> chỉ gửi hồ sơ.
   Future<bool> registerProfile({

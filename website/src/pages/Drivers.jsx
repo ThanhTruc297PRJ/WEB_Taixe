@@ -201,6 +201,15 @@ function Drivers() {
             {record.email && (
               <div className="text-xs text-slate-400">{record.email}</div>
             )}
+            {record.status === 'pending' && (
+              <Tag
+                bordered={false}
+                color={record.email_verified ? 'success' : 'default'}
+                className="mt-0.5 rounded-full px-2 py-0 text-[11px] leading-4"
+              >
+                {record.email_verified ? 'Đã xác thực email' : 'Chưa xác thực email'}
+              </Tag>
+            )}
           </div>
         </div>
       ),
@@ -249,18 +258,28 @@ function Drivers() {
       render: (_, record) => {
         const st = record.status ?? 'active'
         if (st === 'pending') {
+          const verified = !!record.email_verified
+          const approveBtn = (
+            <Button size="small" type="primary" disabled={!verified}>
+              Duyệt
+            </Button>
+          )
           return (
             <Space>
-              <Popconfirm
-                title="Duyệt tài khoản này?"
-                okText="Duyệt"
-                cancelText="Huỷ"
-                onConfirm={() => handleApprove(record.id)}
-              >
-                <Button size="small" type="primary">
-                  Duyệt
-                </Button>
-              </Popconfirm>
+              {verified ? (
+                <Popconfirm
+                  title="Duyệt tài khoản này?"
+                  okText="Duyệt"
+                  cancelText="Huỷ"
+                  onConfirm={() => handleApprove(record.id)}
+                >
+                  {approveBtn}
+                </Popconfirm>
+              ) : (
+                <Tooltip title="Tài xế chưa bấm link xác thực trong email — chưa thể duyệt">
+                  {approveBtn}
+                </Tooltip>
+              )}
               <Button
                 size="small"
                 danger

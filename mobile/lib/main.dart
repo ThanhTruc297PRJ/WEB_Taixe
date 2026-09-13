@@ -78,6 +78,7 @@ class _Gate extends StatelessWidget {
         return const LoginScreen();
       case GateState.register:
         return const RegisterScreen(profileOnly: true);
+      case GateState.emailUnverified:
       case GateState.pending:
       case GateState.rejected:
       case GateState.locked:

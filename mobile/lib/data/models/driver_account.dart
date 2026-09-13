@@ -23,6 +23,7 @@ class DriverAccount {
     required this.phone,
     required this.licenseNumber,
     required this.status,
+    required this.emailVerified,
     this.rejectReason,
   });
 
@@ -31,6 +32,9 @@ class DriverAccount {
   final String phone;
   final String licenseNumber;
   final DriverAccountStatus status;
+  // Đồng bộ trực tiếp từ Firebase Auth mỗi lần gọi /drivers/me — xem
+  // driver_service.sync_email_verified ở backend.
+  final bool emailVerified;
   final String? rejectReason;
 
   factory DriverAccount.fromJson(Map<String, dynamic> j) => DriverAccount(
@@ -39,6 +43,7 @@ class DriverAccount {
         phone: j['phone'] as String? ?? '',
         licenseNumber: j['license_number'] as String? ?? '',
         status: _parseStatus(j['status'] as String?),
+        emailVerified: j['email_verified'] as bool? ?? false,
         rejectReason: j['reject_reason'] as String?,
       );
 }

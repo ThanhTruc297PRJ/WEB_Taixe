@@ -15,6 +15,9 @@ class DriverBase(BaseModel):
     presence: str = "offline"  # "online" | "offline" | "driving"
     last_seen: Optional[datetime] = None
     fcm_token: Optional[str] = None
+    # Đồng bộ từ Firebase Auth (nguồn sự thật là Auth, đây chỉ là cache để web
+    # admin xem nhanh) — xem driver_service.sync_email_verified.
+    email_verified: bool = False
 
 
 class DriverCreate(DriverBase):

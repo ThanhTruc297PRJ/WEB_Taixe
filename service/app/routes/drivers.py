@@ -38,8 +38,10 @@ def register_driver(
 
 @self_router.get("/me")
 def get_my_driver_profile(user: dict = Depends(get_current_user)):
-    """App gọi mỗi lần mở để biết nên vào phần giám sát hay hiện màn chờ duyệt."""
-    driver = driver_service.get_driver(user["uid"])
+    """App gọi mỗi lần mở để biết nên vào phần giám sát hay hiện màn chờ duyệt.
+    Đồng bộ luôn trạng thái xác thực email thật từ Firebase Auth (không chỉ
+    đọc cache Firestore) — để màn "chờ xác thực email" tự cập nhật đúng lúc."""
+    driver = driver_service.sync_email_verified(user["uid"])
     if driver is None:
         raise HTTPException(status_code=404, detail="Chưa đăng ký hồ sơ tài xế")
     return driver
@@ -112,7 +114,13 @@ def update_driver(driver_id: str, data: dict):
 
 @router.put("/{driver_id}/approve")
 def approve_driver(driver_id: str, admin: dict = Depends(get_current_admin)):
-    driver = driver_service.approve_driver(driver_id, admin["uid"])
+    try:
+        driver = driver_service.approve_driver(driver_id, admin["uid"])
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Tài xế chưa xác thực email — chưa thể duyệt",
+        )
     if driver is None:
         raise HTTPException(status_code=404, detail="Driver not found")
     return driver

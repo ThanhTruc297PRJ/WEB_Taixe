@@ -25,4 +25,16 @@ class AuthService {
     if (user == null) return null;
     return user.getIdToken(forceRefresh);
   }
+
+  /// Firebase tự gửi email xác thực (miễn phí, không cần backend) — gọi 1 lần
+  /// ngay sau khi tạo tài khoản, và có thể gọi lại để gửi lại nếu cần.
+  Future<void> sendEmailVerification() async {
+    await _auth.currentUser?.sendEmailVerification();
+  }
+
+  /// Nạp lại thông tin user từ Firebase — cập nhật `emailVerified` cục bộ
+  /// ngay sau khi tài xế bấm link xác thực rồi quay lại app.
+  Future<void> reloadCurrentUser() async {
+    await _auth.currentUser?.reload();
+  }
 }

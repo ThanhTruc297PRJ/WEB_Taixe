@@ -5,6 +5,7 @@ from firebase_admin import auth as firebase_auth
 
 from app.core.firebase import db
 from app.models.driver import DriverCreate, DriverRegister
+from app.services import email_service
 
 COLLECTION = "drivers"
 
@@ -91,12 +92,15 @@ def register_driver(
     if snap.exists and snap.to_dict().get("status") != "rejected":
         return None
 
+    # email_verified: Firebase gửi sẵn email xác thực lúc tạo tài khoản (client
+    # gọi user.sendEmailVerification()) — false cho tới khi tài xế bấm link.
     data = {
         "name": reg.name,
         "phone": reg.phone,
         "license_number": reg.license_number,
         "email": email,
         "status": "pending",
+        "email_verified": False,
         "presence": "offline",
         "last_seen": None,
         "fcm_token": None,
@@ -109,10 +113,37 @@ def register_driver(
     return {"id": uid, **data}
 
 
+def sync_email_verified(driver_id: str) -> Optional[dict]:
+    """Đọc trạng thái xác thực email THẬT (Firebase Auth) và ghi lại vào hồ sơ
+    nếu khác — gọi mỗi lần app tài xế check-in (GET /drivers/me) hoặc trước
+    khi admin duyệt, để không dựa vào dữ liệu Firestore có thể lỗi thời."""
+    doc_ref = db.collection(COLLECTION).document(driver_id)
+    snap = doc_ref.get()
+    if not snap.exists:
+        return None
+    data = snap.to_dict()
+    try:
+        verified = bool(firebase_auth.get_user(driver_id).email_verified)
+    except firebase_auth.UserNotFoundError:
+        return {"id": driver_id, **data}
+    if data.get("email_verified") != verified:
+        doc_ref.update({"email_verified": verified})
+        data["email_verified"] = verified
+    return {"id": driver_id, **data}
+
+
 def approve_driver(driver_id: str, admin_uid: str) -> Optional[dict]:
+    """Duyệt hồ sơ. Raise ValueError("email_not_verified") nếu tài xế chưa
+    xác thực email — chặn đúng theo luồng: đăng ký -> xác thực email -> mới
+    được admin duyệt -> gửi mail báo đã duyệt."""
     doc_ref = db.collection(COLLECTION).document(driver_id)
     if not doc_ref.get().exists:
         return None
+
+    current = sync_email_verified(driver_id)  # luôn kiểm tra lại bằng dữ liệu thật
+    if not (current or {}).get("email_verified"):
+        raise ValueError("email_not_verified")
+
     doc_ref.update(
         {
             "status": "active",
@@ -122,7 +153,13 @@ def approve_driver(driver_id: str, admin_uid: str) -> Optional[dict]:
         }
     )
     _set_approved_claim(driver_id, True)
-    return {"id": driver_id, **doc_ref.get().to_dict()}
+    driver = {"id": driver_id, **doc_ref.get().to_dict()}
+
+    try:
+        email_service.send_registration_approved(driver.get("email"), driver.get("name", ""))
+    except Exception:
+        pass  # gửi mail lỗi không được làm hỏng việc duyệt đã thành công
+    return driver
 
 
 def reject_driver(driver_id: str, reason: str) -> Optional[dict]:
