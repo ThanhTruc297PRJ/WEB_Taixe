@@ -13,27 +13,33 @@ import {
   Table,
   Tag,
 } from 'antd'
-import { BellOutlined, PlusOutlined } from '@ant-design/icons'
+import { BellOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { listVehicles } from '../services/vehicles'
+import { listDrivers } from '../services/drivers'
 import {
   createMaintenance,
   deleteMaintenance,
   listMaintenance,
   notifyMaintenance,
+  scanReminders,
   updateMaintenance,
 } from '../services/maintenance'
 import PageHeader from '../components/PageHeader'
 
+// "Đăng kiểm" đã tách sang trang riêng (Đăng kiểm xe) — không còn chọn được
+// khi tạo mới, chỉ giữ nhãn cho dữ liệu cũ (xem _TYPE_LABELS phía backend).
 const TYPE_OPTIONS = [
   { value: 'oil_change', label: 'Thay dầu' },
   { value: 'tire', label: 'Kiểm tra/thay lốp' },
-  { value: 'inspection', label: 'Đăng kiểm' },
+  { value: 'brake', label: 'Phanh/thắng' },
+  { value: 'battery', label: 'Ắc quy' },
   { value: 'other', label: 'Bảo trì khác' },
 ]
 
 const typeLabel = (value) =>
-  TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value
+  TYPE_OPTIONS.find((o) => o.value === value)?.label ??
+  (value === 'inspection' ? 'Đăng kiểm (dữ liệu cũ)' : value)
 
 const NOTIFY_REASON = {
   driver_has_no_fcm_token: 'Xe chưa gán tài xế hoặc tài xế chưa có thiết bị nhận thông báo',
@@ -49,23 +55,27 @@ function Maintenance() {
   const { message } = App.useApp()
   const [rows, setRows] = useState([])
   const [vehicles, setVehicles] = useState([])
+  const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const [notifyingId, setNotifyingId] = useState(null)
+  const [scanning, setScanning] = useState(false)
   const [form] = Form.useForm()
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [maintenanceList, vehicleList] = await Promise.all([
+      const [maintenanceList, vehicleList, driverList] = await Promise.all([
         listMaintenance(),
         listVehicles(),
+        listDrivers(),
       ])
       setRows(maintenanceList)
       setVehicles(vehicleList)
+      setDrivers(driverList)
     } catch (e) {
       message.error(e.message)
     } finally {
@@ -84,6 +94,12 @@ function Maintenance() {
     return map
   }, [vehicles])
 
+  const driverName = useMemo(() => {
+    const map = {}
+    for (const d of drivers) map[d.id] = d.name
+    return map
+  }, [drivers])
+
   const filtered = useMemo(() => {
     const sorted = [...rows].sort((a, b) =>
       dayjs(a.scheduled_date).valueOf() - dayjs(b.scheduled_date).valueOf(),
@@ -95,10 +111,30 @@ function Maintenance() {
     return sorted.filter((r) => r.status === statusFilter)
   }, [rows, statusFilter])
 
+  const handleScanReminders = async () => {
+    setScanning(true)
+    try {
+      const result = await scanReminders()
+      message.success(
+        `Đã quét: ${result.maintenance.length} lịch bảo trì + ${result.inspections.length} đăng kiểm tới hạn, gửi thành công ${result.sent}`,
+      )
+      load()
+    } catch (e) {
+      message.error(e.message)
+    } finally {
+      setScanning(false)
+    }
+  }
+
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ type: 'oil_change', status: 'pending' })
+    form.setFieldsValue({
+      type: 'oil_change',
+      status: 'pending',
+      remind_days_before: 7,
+      remind_km_before: 500,
+    })
     setModalOpen(true)
   }
 
@@ -106,10 +142,17 @@ function Maintenance() {
     setEditing(record)
     form.setFieldsValue({
       vehicle_id: record.vehicle_id,
+      driver_id: record.driver_id ?? null,
+      vendor: record.vendor ?? '',
       type: record.type,
       scheduled_date: record.scheduled_date ? dayjs(record.scheduled_date) : null,
       status: record.status ?? 'pending',
       odometer: record.odometer ?? null,
+      interval_km: record.interval_km ?? null,
+      due_odometer_km: record.due_odometer_km ?? null,
+      remind_days_before: record.remind_days_before ?? 7,
+      remind_km_before: record.remind_km_before ?? 500,
+      cost: record.cost ?? null,
       note: record.note ?? '',
     })
     setModalOpen(true)
@@ -176,13 +219,28 @@ function Maintenance() {
       dataIndex: 'vehicle_id',
       render: (id) => vehiclePlate[id] || id,
     },
+    {
+      title: 'Người phụ trách',
+      dataIndex: 'driver_id',
+      render: (id) => driverName[id] || '—',
+    },
+    { title: 'Gara thực hiện', dataIndex: 'vendor', render: (v) => v || '—' },
     { title: 'Hạng mục', dataIndex: 'type', render: typeLabel },
     {
       title: 'Ngày hẹn',
       dataIndex: 'scheduled_date',
       render: (d) => dayjs(d).format('DD/MM/YYYY'),
     },
-    { title: 'Số km', dataIndex: 'odometer', render: (v) => v ?? '—' },
+    {
+      title: 'Hẹn tới km',
+      dataIndex: 'due_odometer_km',
+      render: (v) => (v == null ? '—' : `${v.toLocaleString('vi-VN')} km`),
+    },
+    {
+      title: 'Chi phí',
+      dataIndex: 'cost',
+      render: (v) => (v == null ? '—' : `${v.toLocaleString('vi-VN')}đ`),
+    },
     {
       title: 'Trạng thái',
       key: 'status',
@@ -231,9 +289,18 @@ function Maintenance() {
         title="Lịch bảo trì xe"
         subtitle="Lên lịch, theo dõi và nhắc bảo trì định kỳ cho đội xe"
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            Thêm lịch bảo trì
-          </Button>
+          <Space>
+            <Button
+              icon={<SyncOutlined />}
+              loading={scanning}
+              onClick={handleScanReminders}
+            >
+              Quét nhắc ngay
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              Thêm lịch bảo trì
+            </Button>
+          </Space>
         }
       />
 
@@ -283,6 +350,23 @@ function Maintenance() {
               }))}
             />
           </Form.Item>
+          <div className="grid grid-cols-2 gap-x-3">
+            <Form.Item
+              name="driver_id"
+              label="Người phụ trách mang xe đi"
+              tooltip="Có thể khác tài xế thường lái xe này"
+            >
+              <Select
+                allowClear
+                placeholder="Chưa gán"
+                options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+              />
+            </Form.Item>
+            <Form.Item name="vendor" label="Gara / đơn vị thực hiện">
+              <Input placeholder="vd: Gara Thành Đạt" />
+            </Form.Item>
+          </div>
+
           <Form.Item
             name="type"
             label="Hạng mục"
@@ -294,12 +378,44 @@ function Maintenance() {
             name="scheduled_date"
             label="Ngày hẹn"
             rules={[{ required: true, message: 'Chọn ngày hẹn' }]}
+            tooltip="Hệ thống tự nhắc trước khi tới ngày này (xem 'Báo trước mấy ngày' bên dưới)"
           >
             <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="odometer" label="Số km (odometer)">
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
+
+          <div className="grid grid-cols-2 gap-x-3">
+            <Form.Item
+              name="due_odometer_km"
+              label="Hẹn tới km"
+              tooltip="Km dự kiến tới hạn (vd: xe đang 49.700km, chu kỳ 5.000km/lần -> hẹn 54.700km). Bỏ trống nếu không nhắc theo km."
+            >
+              <InputNumber min={0} style={{ width: '100%' }} addonAfter="km" />
+            </Form.Item>
+            <Form.Item name="interval_km" label="Chu kỳ bảo trì">
+              <InputNumber min={0} style={{ width: '100%' }} addonAfter="km" placeholder="vd: 5000" />
+            </Form.Item>
+            <Form.Item
+              name="remind_days_before"
+              label="Báo trước mấy ngày"
+              rules={[{ required: true }]}
+            >
+              <InputNumber min={0} style={{ width: '100%' }} addonAfter="ngày" />
+            </Form.Item>
+            <Form.Item
+              name="remind_km_before"
+              label="Báo khi còn mấy km"
+              rules={[{ required: true }]}
+            >
+              <InputNumber min={0} style={{ width: '100%' }} addonAfter="km" />
+            </Form.Item>
+            <Form.Item name="odometer" label="Số km lúc làm (khi xong)">
+              <InputNumber min={0} style={{ width: '100%' }} addonAfter="km" />
+            </Form.Item>
+            <Form.Item name="cost" label="Chi phí">
+              <InputNumber min={0} style={{ width: '100%' }} addonAfter="đ" />
+            </Form.Item>
+          </div>
+
           <Form.Item name="status" label="Trạng thái">
             <Select
               options={[
