@@ -76,9 +76,13 @@ class AuthViewModel extends ChangeNotifier {
 
   GateState _gateFor(DriverAccount? acc) {
     if (acc == null) return GateState.register;
-    // Xác thực email trước, bất kể trạng thái hồ sơ — đúng thứ tự đăng ký ->
-    // xác thực -> (mới) admin duyệt.
-    if (!acc.emailVerified) return GateState.emailUnverified;
+    // Chỉ chặn "chưa xác thực email" khi hồ sơ CÒN pending (đúng thứ tự đăng
+    // ký -> xác thực -> admin duyệt). Không hồi tố tài khoản đã active từ
+    // trước khi có yêu cầu này — họ đã được duyệt hợp lệ theo luồng cũ, không
+    // tự nhiên bị khoá lại chỉ vì chưa từng xác thực email.
+    if (acc.status == DriverAccountStatus.pending && !acc.emailVerified) {
+      return GateState.emailUnverified;
+    }
     switch (acc.status) {
       case DriverAccountStatus.active:
         return GateState.ready;

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +18,7 @@ from app.routes import (
     consent,
     drivers,
     incidents,
+    inspection,
     kb,
     maintenance,
     music,
@@ -25,6 +27,7 @@ from app.routes import (
     vehicles,
     websocket,
 )
+from app.services import reminder_scheduler
 from app.services.websocket_manager import manager
 
 logging.basicConfig(
@@ -40,9 +43,36 @@ async def _start_heartbeat_monitor():
     app.state.heartbeat_task = asyncio.create_task(manager.heartbeat_monitor())
 
 
+@app.on_event("startup")
+async def _start_reminder_scheduler():
+    # TASK-C10: quét nhắc lịch bảo trì + đăng kiểm tự động chạy nền suốt vòng
+    # đời app — không cần cron ngoài. Rút ngắn chu kỳ lúc demo bằng biến môi
+    # trường REMINDER_SCAN_INTERVAL_SECONDS.
+    interval = int(
+        os.getenv(
+            "REMINDER_SCAN_INTERVAL_SECONDS",
+            reminder_scheduler.DEFAULT_INTERVAL_SECONDS,
+        )
+    )
+    app.state.reminder_task = asyncio.create_task(
+        reminder_scheduler.run_forever(interval)
+    )
+
+
 @app.on_event("shutdown")
 async def _stop_heartbeat_monitor():
     task = getattr(app.state, "heartbeat_task", None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+@app.on_event("shutdown")
+async def _stop_reminder_scheduler():
+    task = getattr(app.state, "reminder_task", None)
     if task:
         task.cancel()
         try:
@@ -93,6 +123,7 @@ app.include_router(drivers.self_router)
 app.include_router(drivers.router)
 app.include_router(vehicles.router)
 app.include_router(maintenance.router)
+app.include_router(inspection.router)
 app.include_router(trips.router)
 app.include_router(incidents.self_router)
 app.include_router(incidents.router)
