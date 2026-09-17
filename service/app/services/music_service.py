@@ -144,6 +144,11 @@ def register_play(track_id: str) -> bool:
     return True
 
 
+def list_reported() -> list[dict]:
+    """Bài hát bị tài xế báo cáo, chờ admin xem xét — cho chuông thông báo web."""
+    return [t for t in list_tracks() if t.get("reported")]
+
+
 def report(track_id: str, reason: Optional[str]) -> Optional[dict]:
     """Tài xế báo cáo bài hát không phù hợp."""
     ref = db.collection(COLLECTION).document(track_id)

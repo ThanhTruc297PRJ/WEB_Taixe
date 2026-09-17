@@ -1,6 +1,6 @@
 import urllib.parse
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from app.core.firebase import bucket, db
@@ -136,6 +136,20 @@ def list_incidents(driver_id: Optional[str] = None) -> list[dict]:
     if driver_id:
         query = query.where("driver_id", "==", driver_id)
     return [{"id": doc.id, **doc.to_dict()} for doc in query.stream()]
+
+
+def list_recent(hours: int = 24) -> list[dict]:
+    """Sự cố trong N giờ gần nhất, mới nhất trước — cho chuông thông báo web.
+    Model chưa có field "đã xử lý" nên dùng cửa sổ thời gian làm proxy cho
+    "cần admin chú ý"."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    recent = [
+        i
+        for i in list_incidents()
+        if i.get("detected_at") and i["detected_at"] >= cutoff
+    ]
+    recent.sort(key=lambda i: i["detected_at"], reverse=True)
+    return recent
 
 
 def delete_incident(incident_id: str) -> bool:

@@ -150,3 +150,21 @@ def run_auto_reminders() -> list[dict]:
         result = notify_inspection(insp["id"])
         results.append({"inspection_id": insp["id"], **result})
     return results
+
+
+def list_upcoming(now: Optional[datetime] = None) -> list[dict]:
+    """Đăng kiểm còn pending và sắp hết hạn tem — cho chuông thông báo trên
+    web. Khác `due_for_auto_reminder` ở chỗ không loại trừ theo
+    `last_reminded_at` (xem lý do ở [[maintenance_service.list_upcoming]])."""
+    now = now or datetime.now(timezone.utc)
+    upcoming = []
+    for insp in list_inspections():
+        if insp.get("status") != "pending":
+            continue
+        expiry = insp.get("old_sticker_expiry")
+        if not expiry:
+            continue
+        days_left = (expiry - now).total_seconds() / 86400
+        if days_left <= insp.get("remind_days_before", 15):
+            upcoming.append(insp)
+    return upcoming

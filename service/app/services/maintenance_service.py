@@ -145,3 +145,34 @@ def run_auto_reminders() -> list[dict]:
         result = notify_maintenance(m["id"])
         results.append({"maintenance_id": m["id"], **result})
     return results
+
+
+def list_upcoming(now: Optional[datetime] = None) -> list[dict]:
+    """Bảo trì còn pending và sắp tới hạn (ngày hoặc km) — cho chuông thông
+    báo trên web. Khác `due_for_auto_reminder` ở chỗ KHÔNG loại trừ lịch vừa
+    mới nhắc trong 24h: ở đây cần phản ánh đúng trạng thái "còn sắp tới hạn
+    hay không", không phải quyết định có nên gửi push tiếp hay không."""
+    now = now or datetime.now(timezone.utc)
+    upcoming = []
+    for m in list_maintenance():
+        if m.get("status") != "pending":
+            continue
+
+        near_by_date = False
+        scheduled = m.get("scheduled_date")
+        if scheduled:
+            days_left = (scheduled - now).total_seconds() / 86400
+            near_by_date = days_left <= m.get("remind_days_before", 7)
+
+        near_by_km = False
+        due_km = m.get("due_odometer_km")
+        if due_km is not None:
+            vehicle = vehicle_service.get_vehicle(m["vehicle_id"])
+            current_km = (vehicle or {}).get("current_odometer_km")
+            if current_km is not None:
+                km_left = due_km - current_km
+                near_by_km = km_left <= m.get("remind_km_before", 500)
+
+        if near_by_date or near_by_km:
+            upcoming.append(m)
+    return upcoming

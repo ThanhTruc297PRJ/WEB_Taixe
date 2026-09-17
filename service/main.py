@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.middleware import ip_whitelist_middleware, request_logging_middleware
 from app.core.rate_limit import limiter
 from app.routes import (
+    admin_notifications,
     assistant,
     auth,
     consent,
@@ -133,6 +134,7 @@ app.include_router(music.self_router)
 app.include_router(music.router)
 app.include_router(websocket.router)
 app.include_router(sync.router)
+app.include_router(admin_notifications.router)
 
 
 @app.get("/health")

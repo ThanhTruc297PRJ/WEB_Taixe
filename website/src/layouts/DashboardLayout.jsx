@@ -19,6 +19,7 @@ const SEVERITY_TEXT = {
 
 function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
+  const [notificationsRefreshSignal, setNotificationsRefreshSignal] = useState(0)
   const { notification } = App.useApp()
   const navigate = useNavigate()
 
@@ -35,6 +36,7 @@ function DashboardLayout() {
 
   const handleAlert = useCallback(
     (alert) => {
+      setNotificationsRefreshSignal((prev) => prev + 1)
       playAlarm(alert.severity)
       notification.error({
         message: `${SEVERITY_TEXT[alert.severity] ?? 'Cảnh báo'}: ${
@@ -75,6 +77,7 @@ function DashboardLayout() {
             collapsed={collapsed}
             onToggle={() => setCollapsed((prev) => !prev)}
             wsConnected={connected}
+            notificationsRefreshSignal={notificationsRefreshSignal}
           />
           <Content className="p-6">
             <div className="mx-auto max-w-[1280px]">
