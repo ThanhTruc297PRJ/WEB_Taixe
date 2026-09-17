@@ -37,4 +37,10 @@ class AuthService {
   Future<void> reloadCurrentUser() async {
     await _auth.currentUser?.reload();
   }
+
+  /// Firebase tự gửi email đặt lại mật khẩu (miễn phí, không cần backend) —
+  /// tài xế bấm link trong email để tự đặt mật khẩu mới. Không yêu cầu đăng
+  /// nhập trước đó (dùng ngay từ màn đăng nhập khi quên mật khẩu).
+  Future<void> sendPasswordResetEmail(String email) =>
+      _auth.sendPasswordResetEmail(email: email.trim());
 }

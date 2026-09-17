@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -187,6 +188,33 @@ def set_fcm_token(driver_id: str, token: str) -> Optional[dict]:
         return None
     doc_ref.update({"fcm_token": token})
     return {"id": driver_id, **doc_ref.get().to_dict()}
+
+
+def reset_password(driver_id: str) -> dict:
+    """Admin đặt lại mật khẩu cho tài xế — dùng khi tài xế gọi báo quên mật
+    khẩu (bổ sung cho luồng tự gửi mail đặt lại mật khẩu trên app, phòng khi
+    tài xế không vào được email). Sinh mật khẩu tạm ngẫu nhiên, ghi thẳng vào
+    Firebase Auth, thu hồi phiên đăng nhập cũ để bắt buộc dùng mật khẩu mới
+    ngay. Trả về mật khẩu tạm — KHÔNG lưu lại ở đâu, admin phải báo ngay cho
+    tài xế lúc này vì chỉ xem được một lần.
+
+    Raise ValueError("driver_not_found") hoặc ValueError("no_firebase_account")
+    — route dịch thành 404 / 400 tương ứng."""
+    doc_ref = db.collection(COLLECTION).document(driver_id)
+    if not doc_ref.get().exists:
+        raise ValueError("driver_not_found")
+
+    try:
+        firebase_auth.get_user(driver_id)
+    except firebase_auth.UserNotFoundError:
+        # Tài xế do admin tạo tay (doc id ngẫu nhiên, không gắn tài khoản
+        # Firebase nào) -> không có mật khẩu nào để đặt lại.
+        raise ValueError("no_firebase_account")
+
+    temp_password = secrets.token_urlsafe(9)  # ~12 ký tự, đủ mạnh
+    firebase_auth.update_user(driver_id, password=temp_password)
+    firebase_auth.revoke_refresh_tokens(driver_id)
+    return {"temp_password": temp_password}
 
 
 def set_presence(driver_id: str, presence: str) -> Optional[dict]:

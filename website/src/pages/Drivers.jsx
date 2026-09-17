@@ -15,8 +15,9 @@ import {
   Table,
   Tag,
   Tooltip,
+  Typography,
 } from 'antd'
-import { PlusOutlined, SyncOutlined } from '@ant-design/icons'
+import { KeyOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import PageHeader from '../components/PageHeader'
 import {
@@ -26,6 +27,7 @@ import {
   listDrivers,
   lockDriver,
   rejectDriver,
+  resetDriverPassword,
   unlockDriver,
   updateDriver,
 } from '../services/drivers'
@@ -66,7 +68,7 @@ function presenceInfo(record) {
 }
 
 function Drivers() {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const { drivers: liveDrivers, loading, error } = useDrivers()
   const [fallback, setFallback] = useState(null)
   const [search, setSearch] = useState('')
@@ -172,6 +174,40 @@ function Drivers() {
   const handleUnlock = act(unlockDriver, 'Đã mở khoá')
   const handleDelete = act(deleteDriver, 'Đã xoá')
 
+  const handleResetPassword = (record) => {
+    modal.confirm({
+      title: `Đặt lại mật khẩu cho ${record.name}?`,
+      content:
+        'Mật khẩu cũ sẽ ngừng dùng được ngay. Hệ thống tạo mật khẩu tạm mới — ' +
+        'bạn cần báo lại cho tài xế ngay sau đó vì chỉ xem được một lần duy nhất.',
+      okText: 'Đặt lại',
+      cancelText: 'Huỷ',
+      onOk: async () => {
+        try {
+          const { temp_password: tempPassword } = await resetDriverPassword(record.id)
+          modal.success({
+            title: 'Đã đặt lại mật khẩu',
+            content: (
+              <div>
+                <p className="mb-2 text-sm text-slate-500">
+                  Mật khẩu tạm cho <b>{record.name}</b>:
+                </p>
+                <Typography.Text code copyable style={{ fontSize: 16 }}>
+                  {tempPassword}
+                </Typography.Text>
+                <p className="mt-3 text-xs text-slate-400">
+                  Báo ngay cho tài xế — mật khẩu này chỉ hiện một lần, hệ thống không lưu lại.
+                </p>
+              </div>
+            ),
+          })
+        } catch (e) {
+          message.error(e.message)
+        }
+      },
+    })
+  }
+
   const handleReject = async () => {
     const reason = rejectReason.trim()
     if (!reason) {
@@ -253,7 +289,7 @@ function Drivers() {
     {
       title: '',
       key: 'actions',
-      width: 190,
+      width: 230,
       align: 'right',
       render: (_, record) => {
         const st = record.status ?? 'active'
@@ -299,6 +335,13 @@ function Drivers() {
               <Button size="small" onClick={() => openEdit(record)}>
                 Sửa
               </Button>
+              <Tooltip title="Đặt lại mật khẩu">
+                <Button
+                  size="small"
+                  icon={<KeyOutlined />}
+                  onClick={() => handleResetPassword(record)}
+                />
+              </Tooltip>
               <Popconfirm
                 title="Khoá tài khoản này?"
                 okText="Khoá"
@@ -318,6 +361,13 @@ function Drivers() {
               <Button size="small" type="primary" onClick={() => handleUnlock(record.id)}>
                 Mở khoá
               </Button>
+              <Tooltip title="Đặt lại mật khẩu">
+                <Button
+                  size="small"
+                  icon={<KeyOutlined />}
+                  onClick={() => handleResetPassword(record)}
+                />
+              </Tooltip>
               <Popconfirm
                 title="Xoá tài xế này?"
                 okText="Xoá"

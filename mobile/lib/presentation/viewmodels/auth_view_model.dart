@@ -128,6 +128,11 @@ class AuthViewModel extends ChangeNotifier {
   Future<bool> resendVerificationEmail() =>
       _run(() => _auth.sendEmailVerification());
 
+  /// Quên mật khẩu: gửi email đặt lại mật khẩu (màn "Quên mật khẩu?" từ màn
+  /// đăng nhập gọi). Không cần đăng nhập trước đó.
+  Future<bool> sendPasswordResetEmail(String email) =>
+      _run(() => _auth.sendPasswordResetEmail(email));
+
   /// Đã đăng nhập nhưng thiếu hồ sơ -> chỉ gửi hồ sơ.
   Future<bool> registerProfile({
     required String name,

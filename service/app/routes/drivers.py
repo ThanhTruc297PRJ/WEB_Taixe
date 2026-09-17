@@ -150,6 +150,22 @@ def unlock_driver(driver_id: str):
     return driver
 
 
+@router.post("/{driver_id}/reset-password")
+def reset_driver_password(driver_id: str):
+    """Admin đặt lại mật khẩu cho tài xế (hỗ trợ khi tài xế gọi báo quên mật
+    khẩu). Trả `{"temp_password": "..."}` — chỉ hiện đúng 1 lần, admin phải
+    báo ngay cho tài xế."""
+    try:
+        return driver_service.reset_password(driver_id)
+    except ValueError as e:
+        if str(e) == "driver_not_found":
+            raise HTTPException(status_code=404, detail="Driver not found")
+        raise HTTPException(
+            status_code=400,
+            detail="Tài xế này không có tài khoản Firebase (do admin tạo tay) — không đặt lại mật khẩu được",
+        )
+
+
 @router.delete("/{driver_id}")
 def delete_driver(driver_id: str):
     if not driver_service.delete_driver(driver_id):
