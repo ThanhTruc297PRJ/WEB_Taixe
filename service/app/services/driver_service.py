@@ -77,6 +77,14 @@ def delete_driver(driver_id: str) -> bool:
         firebase_auth.delete_user(driver_id)  # với tài khoản tự đăng ký: id = uid
     except firebase_auth.UserNotFoundError:
         pass
+
+    # Xoá HẲN tài xế -> dọn luôn lịch sử sự cố gắn với họ, tránh điểm vi phạm
+    # "ma" của tài khoản không còn tồn tại vẫn cộng vào tổng điểm toàn đội xe
+    # trên trang Báo cáo sự cố. Import trễ để tránh vòng lặp import (incident_
+    # service đã import driver_service ở trên).
+    from app.services import incident_service
+
+    incident_service.delete_by_driver(driver_id)
     return True
 
 

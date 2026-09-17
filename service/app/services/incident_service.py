@@ -158,3 +158,15 @@ def delete_incident(incident_id: str) -> bool:
         return False
     doc_ref.delete()
     return True
+
+
+def delete_by_driver(driver_id: str) -> int:
+    """Xoá toàn bộ sự cố của 1 tài xế — gọi khi XOÁ HẲN tài xế (không áp
+    dụng lúc chỉ khoá/từ chối, đó là trạng thái tạm, hồ sơ vẫn còn). Nếu
+    không dọn, điểm vi phạm của tài khoản đã xoá vẫn cộng vào tổng điểm toàn
+    đội xe trên trang Báo cáo sự cố, và tên hiển thị thành UID thô. Trả số
+    lượng đã xoá."""
+    incidents = list_incidents(driver_id)
+    for i in incidents:
+        delete_incident(i["id"])
+    return len(incidents)
