@@ -28,4 +28,13 @@ class DriverApi {
       rethrow;
     }
   }
+
+  /// Email đã có tài khoản đăng nhập chưa — dùng cho luồng quên mật khẩu,
+  /// để báo rõ nếu email chưa từng đăng ký thay vì im lặng gửi vào hư không.
+  Future<bool> emailHasAccount(String email) async {
+    final j = await _c.get(
+      '/auth/check-email?email=${Uri.encodeQueryComponent(email.trim())}',
+    );
+    return (j as Map<String, dynamic>)['exists'] == true;
+  }
 }

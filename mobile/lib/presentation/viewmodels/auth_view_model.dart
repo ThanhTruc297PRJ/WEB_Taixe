@@ -128,10 +128,20 @@ class AuthViewModel extends ChangeNotifier {
   Future<bool> resendVerificationEmail() =>
       _run(() => _auth.sendEmailVerification());
 
-  /// Quên mật khẩu: gửi email đặt lại mật khẩu (màn "Quên mật khẩu?" từ màn
-  /// đăng nhập gọi). Không cần đăng nhập trước đó.
-  Future<bool> sendPasswordResetEmail(String email) =>
-      _run(() => _auth.sendPasswordResetEmail(email));
+  /// Quên mật khẩu: kiểm tra email đã có tài khoản chưa trước (tránh Firebase
+  /// âm thầm không gửi gì mà vẫn báo "thành công" khi gõ nhầm/chưa từng đăng
+  /// ký — tài xế sẽ chờ mail không bao giờ tới mà không biết vì sao), rồi
+  /// mới nhờ Firebase gửi email đặt lại mật khẩu. Không cần đăng nhập trước.
+  Future<bool> sendPasswordResetEmail(String email) => _run(() async {
+        final exists = await _driverApi.emailHasAccount(email);
+        if (!exists) {
+          throw ApiException(
+            404,
+            'Email này chưa có tài khoản — kiểm tra lại hoặc đăng ký mới.',
+          );
+        }
+        await _auth.sendPasswordResetEmail(email);
+      });
 
   /// Đã đăng nhập nhưng thiếu hồ sơ -> chỉ gửi hồ sơ.
   Future<bool> registerProfile({

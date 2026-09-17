@@ -116,6 +116,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
         title: const Text('Đăng ký tài xế'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        // Màn này khi profileOnly=true là màn GỐC (GateState.register, đã
+        // đăng nhập nhưng chưa có hồ sơ) -> không có back tự động. Cần nút
+        // đăng xuất để thoát được nếu lỡ đăng nhập nhầm tài khoản (VD tài
+        // khoản admin không có hồ sơ tài xế), không thì bị kẹt luôn ở đây.
+        actions: widget.profileOnly
+            ? [
+                IconButton(
+                  tooltip: 'Đăng xuất',
+                  icon: const Icon(Icons.logout),
+                  onPressed: vm.busy
+                      ? null
+                      : () => context.read<AuthViewModel>().signOut(),
+                ),
+              ]
+            : null,
       ),
       body: Container(
         decoration: const BoxDecoration(
