@@ -40,6 +40,7 @@ function Vehicles() {
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [driverFilter, setDriverFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -77,12 +78,19 @@ function Vehicles() {
     return rows.filter((v) => {
       const status = v.status ?? 'active'
       if (statusFilter !== 'all' && status !== statusFilter) return false
+      if (driverFilter === 'unassigned' && v.driver_id) return false
+      if (
+        driverFilter !== 'all' &&
+        driverFilter !== 'unassigned' &&
+        v.driver_id !== driverFilter
+      )
+        return false
       if (!q) return true
       return [v.plate_number, v.brand, v.model]
         .filter(Boolean)
         .some((x) => String(x).toLowerCase().includes(q))
     })
-  }, [rows, search, statusFilter])
+  }, [rows, search, statusFilter, driverFilter])
 
   const openCreate = () => {
     setEditing(null)
@@ -214,6 +222,18 @@ function Vehicles() {
           options={[
             { value: 'all', label: 'Tất cả trạng thái' },
             ...STATUS_OPTIONS,
+          ]}
+        />
+        <Select
+          value={driverFilter}
+          onChange={setDriverFilter}
+          showSearch
+          optionFilterProp="label"
+          style={{ width: 220 }}
+          options={[
+            { value: 'all', label: 'Tất cả tài xế' },
+            { value: 'unassigned', label: 'Chưa gán tài xế' },
+            ...drivers.map((d) => ({ value: d.id, label: d.name })),
           ]}
         />
       </Space>

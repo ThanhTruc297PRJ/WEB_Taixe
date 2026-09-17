@@ -31,6 +31,7 @@ import {
   unlockDriver,
   updateDriver,
 } from '../services/drivers'
+import { listVehicles } from '../services/vehicles'
 import { useDrivers } from '../contexts/useDrivers'
 import { toDate } from '../utils/firestore'
 
@@ -78,6 +79,7 @@ function Drivers() {
   const [saving, setSaving] = useState(false)
   const [rejectTarget, setRejectTarget] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [vehicles, setVehicles] = useState([])
   const [form] = Form.useForm()
 
   useEffect(() => {
@@ -87,6 +89,23 @@ function Drivers() {
       .then(setFallback)
       .catch((e) => message.error(e.message))
   }, [error, message])
+
+  useEffect(() => {
+    listVehicles()
+      .then(setVehicles)
+      .catch(() => {
+        /* không chặn trang tài xế nếu tải xe lỗi — cột "Xe phụ trách" chỉ hiện — */
+      })
+  }, [])
+
+  const vehiclesByDriver = useMemo(() => {
+    const map = {}
+    for (const v of vehicles) {
+      if (!v.driver_id) continue
+      ;(map[v.driver_id] ??= []).push(v)
+    }
+    return map
+  }, [vehicles])
 
   const rows = useMemo(
     () => (error ? (fallback ?? []) : liveDrivers),
@@ -252,6 +271,22 @@ function Drivers() {
     },
     { title: 'Số điện thoại', dataIndex: 'phone', render: (v) => v || '—' },
     { title: 'Số bằng lái', dataIndex: 'license_number', render: (v) => v || '—' },
+    {
+      title: 'Xe phụ trách',
+      key: 'vehicles',
+      render: (_, record) => {
+        const list = vehiclesByDriver[record.id] || []
+        if (!list.length) return <span className="text-slate-300">—</span>
+        const label = list.length === 1 ? list[0].plate_number : `${list.length} xe`
+        return (
+          <Tooltip title={list.map((v) => v.plate_number).join(', ')}>
+            <Tag bordered={false} color="blue" className="rounded-full px-2.5 py-0.5">
+              {label}
+            </Tag>
+          </Tooltip>
+        )
+      },
+    },
     {
       title: 'Ngày đăng ký',
       dataIndex: 'submitted_at',
