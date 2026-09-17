@@ -84,13 +84,19 @@ def _recent_incidents() -> dict:
 
 
 def _reported_music() -> dict:
-    reported = music_service.list_reported()
+    # Sắp theo số lượt báo cáo giảm dần -> bài bị nhiều người báo cáo nhất lên
+    # đầu danh sách xem trước (quan trọng hơn bài chỉ 1 người báo cáo nhầm).
+    reported = sorted(
+        music_service.list_reported(),
+        key=lambda t: t.get("report_count") or 0,
+        reverse=True,
+    )
     items = [
         {
             "id": t["id"],
             "title": t.get("title"),
             "artist": t.get("artist"),
-            "report_count": t.get("report_count"),
+            "report_count": t.get("report_count") or 0,
         }
         for t in reported[:_ITEM_LIMIT]
     ]

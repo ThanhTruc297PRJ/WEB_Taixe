@@ -59,7 +59,12 @@ const SECTIONS = [
     label: 'Bài hát bị báo cáo',
     path: '/music',
     icon: <CustomerServiceOutlined />,
-    describe: (item) => item.artist || '',
+    describe: (item) => {
+      const count = item.report_count || 0
+      const artist = item.artist || ''
+      const reportText = count > 0 ? `${count} lượt báo cáo` : 'Đã bị báo cáo'
+      return artist ? `${artist} · ${reportText}` : reportText
+    },
   },
 ]
 
