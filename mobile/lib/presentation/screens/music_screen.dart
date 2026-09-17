@@ -324,6 +324,15 @@ class _MusicScreenState extends State<MusicScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
+                    tooltip: 'Báo cáo bài hát',
+                    icon: const Icon(
+                      FluentIcons.flag_24_regular,
+                      color: Colors.white38,
+                      size: 18,
+                    ),
+                    onPressed: () => _confirmReport(musicVM, song),
+                  ),
+                  IconButton(
                     icon: Icon(
                       isFav
                           ? FluentIcons.heart_24_filled
