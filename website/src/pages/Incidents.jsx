@@ -259,6 +259,7 @@ function Incidents() {
         footer={null}
         onCancel={() => setSelected(null)}
         width={560}
+        styles={{ body: { maxHeight: '75vh', overflowY: 'auto', paddingRight: 4 } }}
         destroyOnHidden
       >
         {selected && (

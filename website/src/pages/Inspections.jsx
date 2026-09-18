@@ -350,6 +350,7 @@ function Inspections() {
         okText="Lưu"
         cancelText="Huỷ"
         width={600}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 } }}
         destroyOnHidden
       >
         <Form form={form} layout="vertical">

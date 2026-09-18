@@ -334,6 +334,7 @@ function Maintenance() {
         onCancel={() => setModalOpen(false)}
         okText="Lưu"
         cancelText="Huỷ"
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 } }}
         destroyOnHidden
       >
         <Form form={form} layout="vertical">
