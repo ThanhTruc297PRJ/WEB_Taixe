@@ -1,72 +1,12 @@
 import { Layout, Badge, Space, Tooltip, Popover, Empty } from 'antd'
-import {
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  BellOutlined,
-  TeamOutlined,
-  ToolOutlined,
-  SafetyCertificateOutlined,
-  WarningOutlined,
-  CustomerServiceOutlined,
-} from '@ant-design/icons'
+import { MenuFoldOutlined, MenuUnfoldOutlined, BellOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
-import dayjs from 'dayjs'
 import UserProfile from '../components/UserProfile'
 import { navTitle } from './navConfig'
 import { useAdminNotifications } from '../hooks/useAdminNotifications'
+import { NOTIFICATION_SECTIONS as SECTIONS } from '../config/notificationSections'
 
 const { Header: AntHeader } = Layout
-
-const SECTIONS = [
-  {
-    key: 'pending_drivers',
-    label: 'Tài xế chờ duyệt',
-    path: '/drivers',
-    icon: <TeamOutlined />,
-    describe: (item) =>
-      item.email_verified ? 'Đã xác thực email — duyệt được ngay' : 'Chưa xác thực email',
-  },
-  {
-    key: 'maintenance_due',
-    label: 'Bảo trì sắp tới hạn',
-    path: '/maintenance',
-    icon: <ToolOutlined />,
-    describe: (item) =>
-      item.scheduled_date
-        ? `Hẹn ${dayjs(item.scheduled_date).format('DD/MM/YYYY')}`
-        : 'Sắp tới hạn theo km',
-  },
-  {
-    key: 'inspections_due',
-    label: 'Đăng kiểm sắp tới hạn',
-    path: '/inspections',
-    icon: <SafetyCertificateOutlined />,
-    describe: (item) =>
-      item.old_sticker_expiry
-        ? `Tem hết hạn ${dayjs(item.old_sticker_expiry).format('DD/MM/YYYY')}`
-        : item.station || '',
-  },
-  {
-    key: 'recent_incidents',
-    label: 'Sự cố an toàn gần đây',
-    path: '/incidents',
-    icon: <WarningOutlined />,
-    describe: (item) =>
-      item.detected_at ? dayjs(item.detected_at).format('HH:mm DD/MM') : '',
-  },
-  {
-    key: 'reported_music',
-    label: 'Bài hát bị báo cáo',
-    path: '/music',
-    icon: <CustomerServiceOutlined />,
-    describe: (item) => {
-      const count = item.report_count || 0
-      const artist = item.artist || ''
-      const reportText = count > 0 ? `${count} lượt báo cáo` : 'Đã bị báo cáo'
-      return artist ? `${artist} · ${reportText}` : reportText
-    },
-  },
-]
 
 // Style inline (không dùng class Tailwind) cho riêng panel này — nội dung
 // Popover của AntD render qua Portal và bị CSS-in-JS của AntD đè mất layout
