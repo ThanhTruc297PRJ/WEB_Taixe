@@ -20,14 +20,17 @@ import {
   MailOutlined,
   PlusOutlined,
   DownloadOutlined,
+  PrinterOutlined,
   SaveOutlined,
 } from '@ant-design/icons'
 import { sendPasswordResetEmail, updateProfile } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import dayjs from 'dayjs'
 import PageHeader from '../components/PageHeader'
+import { PrintableReport, triggerPrint } from '../components/PrintableReport'
 import { auth, storage } from '../services/firebase'
 import { useAuth } from '../contexts/useAuth'
+import { initials, avatarColor } from '../utils/avatar'
 import {
   getSettings,
   updateSettings,
@@ -41,21 +44,6 @@ import { listVehicles } from '../services/vehicles'
 import { exportCsv } from '../utils/csv'
 
 // ── Tab: Tài khoản ─────────────────────────────────────────────────────
-const AVATAR_COLORS = ['#2563EB', '#7C3AED', '#0891B2', '#DB2777', '#D97706', '#059669']
-
-function initials(text) {
-  const parts = String(text ?? '').trim().split(/\s+/).filter(Boolean)
-  if (!parts.length) return '?'
-  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
-}
-
-function avatarColor(seed) {
-  const s = String(seed ?? '')
-  let h = 0
-  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]
-}
-
 const MAX_AVATAR_BYTES = 3 * 1024 * 1024
 
 function AccountTab() {
@@ -485,8 +473,8 @@ function CostReportTab() {
 
   const money = (v) => `${(v || 0).toLocaleString('vi-VN')}đ`
 
-  const handleExport = () => {
-    const rows = [
+  const reportRows = useMemo(
+    () => [
       ...maintenance.map((m) => ({
         loai: 'Bảo trì',
         xe: vehiclePlate[m.vehicle_id] || m.vehicle_id,
@@ -501,14 +489,24 @@ function CostReportTab() {
         hangMuc: 'Phí kiểm định + phí đường bộ',
         chiPhi: (i.inspection_fee || 0) + (i.road_fee || 0),
       })),
-    ]
-    exportCsv(`bao-cao-chi-phi-${dayjs().format('YYYY-MM-DD')}.csv`, rows, [
-      { label: 'Loại', value: (r) => r.loai },
-      { label: 'Xe', value: (r) => r.xe },
-      { label: 'Ngày', value: (r) => r.ngay },
-      { label: 'Hạng mục', value: (r) => r.hangMuc },
-      { label: 'Chi phí (đ)', value: (r) => r.chiPhi },
-    ])
+    ],
+    [maintenance, inspections, vehiclePlate],
+  )
+
+  const reportColumns = [
+    { key: 'loai', label: 'Loại', value: (r) => r.loai },
+    { key: 'xe', label: 'Xe', value: (r) => r.xe },
+    { key: 'ngay', label: 'Ngày', value: (r) => r.ngay },
+    { key: 'hangMuc', label: 'Hạng mục', value: (r) => r.hangMuc },
+    { key: 'chiPhi', label: 'Chi phí (đ)', value: (r) => money(r.chiPhi) },
+  ]
+
+  const handleExportCsv = () => {
+    exportCsv(
+      `bao-cao-chi-phi-${dayjs().format('YYYY-MM-DD')}.csv`,
+      reportRows,
+      reportColumns.map((c) => ({ label: c.label, value: (r) => c.value(r) })),
+    )
   }
 
   if (loading) return <Card loading />
@@ -518,9 +516,14 @@ function CostReportTab() {
   return (
     <Card
       extra={
-        <Button icon={<DownloadOutlined />} onClick={handleExport} disabled={!hasData}>
-          Xuất CSV
-        </Button>
+        <Space>
+          <Button icon={<DownloadOutlined />} onClick={handleExportCsv} disabled={!hasData}>
+            Xuất CSV
+          </Button>
+          <Button icon={<PrinterOutlined />} onClick={triggerPrint} disabled={!hasData}>
+            Xuất PDF
+          </Button>
+        </Space>
       }
     >
       {!hasData ? (
@@ -564,6 +567,13 @@ function CostReportTab() {
                 render: money,
               },
             ]}
+          />
+
+          <PrintableReport
+            title="Báo cáo chi phí bảo trì & đăng kiểm"
+            subtitle={`Tổng cộng: ${money(totals.grandTotal)} (Bảo trì ${money(totals.maintenanceCost)} · Phí kiểm định ${money(totals.inspectionFee)} · Phí đường bộ ${money(totals.roadFee)})`}
+            columns={reportColumns}
+            rows={reportRows}
           />
         </>
       )}

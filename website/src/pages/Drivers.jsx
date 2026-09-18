@@ -17,7 +17,8 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
-import { KeyOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons'
+import { KeyOutlined, PlusOutlined, SoundOutlined, SyncOutlined } from '@ant-design/icons'
+import { useLocation } from 'react-router-dom'
 import dayjs from 'dayjs'
 import PageHeader from '../components/PageHeader'
 import {
@@ -28,12 +29,14 @@ import {
   lockDriver,
   rejectDriver,
   resetDriverPassword,
+  sendAlertSound,
   unlockDriver,
   updateDriver,
 } from '../services/drivers'
 import { listVehicles } from '../services/vehicles'
 import { useDrivers } from '../contexts/useDrivers'
 import { toDate } from '../utils/firestore'
+import { initials, avatarColor } from '../utils/avatar'
 
 const STATUS_META = {
   pending: { label: 'Chờ duyệt', color: 'gold' },
@@ -44,21 +47,6 @@ const STATUS_META = {
 
 const STALE_MS = 120_000
 
-const AVATAR_COLORS = ['#2563EB', '#7C3AED', '#0891B2', '#DB2777', '#D97706', '#059669']
-
-function initials(name) {
-  const parts = String(name ?? '').trim().split(/\s+/).filter(Boolean)
-  if (!parts.length) return '?'
-  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
-}
-
-function avatarColor(seed) {
-  const s = String(seed ?? '')
-  let h = 0
-  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]
-}
-
 function presenceInfo(record) {
   const raw = record.presence ?? 'offline'
   const lastSeen = toDate(record.last_seen)
@@ -68,11 +56,25 @@ function presenceInfo(record) {
   return { status: 'default', text: 'Ngoại tuyến' }
 }
 
+// Tốc độ chỉ gửi khi app đang mở ở foreground (không theo dõi nền) — cửa sổ
+// "còn mới" ngắn hơn hẳn STALE_MS của presence, vì tài xế tắt/thu nhỏ app là
+// dừng gửi ngay, số liệu cũ quá vài chục giây coi như không đáng tin.
+const SPEED_STALE_MS = 30_000
+
+function speedText(record) {
+  const updatedAt = toDate(record.speed_updated_at)
+  if (record.current_speed_kmh == null || !updatedAt) return null
+  if (Date.now() - updatedAt.getTime() > SPEED_STALE_MS) return null
+  return `${Math.round(record.current_speed_kmh)} km/h`
+}
+
 function Drivers() {
   const { message, modal } = App.useApp()
+  const location = useLocation()
   const { drivers: liveDrivers, loading, error } = useDrivers()
   const [fallback, setFallback] = useState(null)
-  const [search, setSearch] = useState('')
+  // Điền sẵn từ khoá khi điều hướng tới từ ô tìm nhanh trên Header.
+  const [search, setSearch] = useState(location.state?.initialSearch || '')
   const [statusFilter, setStatusFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -227,6 +229,23 @@ function Drivers() {
     })
   }
 
+  const handleAlertSound = async (record) => {
+    try {
+      const result = await sendAlertSound(record.id)
+      if (result.sent) {
+        message.success(`Đã gửi cảnh báo tới ${record.name}`)
+      } else {
+        message.warning(
+          result.reason === 'driver_has_no_fcm_token'
+            ? `${record.name} chưa mở app trên thiết bị nào để nhận được thông báo`
+            : `Không gửi được: ${result.reason}`,
+        )
+      }
+    } catch (e) {
+      message.error(e.message)
+    }
+  }
+
   const handleReject = async () => {
     const reason = rejectReason.trim()
     if (!reason) {
@@ -248,8 +267,11 @@ function Drivers() {
       dataIndex: 'name',
       render: (name, record) => (
         <div className="flex items-center gap-3">
-          <Avatar style={{ backgroundColor: avatarColor(record.id || name) }}>
-            {initials(name)}
+          <Avatar
+            src={record.photo_url || undefined}
+            style={record.photo_url ? undefined : { backgroundColor: avatarColor(record.id || name) }}
+          >
+            {!record.photo_url && initials(name)}
           </Avatar>
           <div className="leading-tight">
             <div className="font-medium text-slate-800">{name || '(chưa có tên)'}</div>
@@ -300,7 +322,17 @@ function Drivers() {
       key: 'presence',
       render: (_, record) => {
         const { status, text } = presenceInfo(record)
-        return <Badge status={status} text={text} />
+        const speed = speedText(record)
+        return (
+          <Space size={6}>
+            <Badge status={status} text={text} />
+            {speed && (
+              <Tag bordered={false} color="blue" className="rounded-full px-2 py-0 text-[11px]">
+                {speed}
+              </Tag>
+            )}
+          </Space>
+        )
       },
     },
     {
@@ -324,7 +356,7 @@ function Drivers() {
     {
       title: '',
       key: 'actions',
-      width: 230,
+      width: 270,
       align: 'right',
       render: (_, record) => {
         const st = record.status ?? 'active'
@@ -375,6 +407,13 @@ function Drivers() {
                   size="small"
                   icon={<KeyOutlined />}
                   onClick={() => handleResetPassword(record)}
+                />
+              </Tooltip>
+              <Tooltip title="Phát loa cảnh báo tới tài xế">
+                <Button
+                  size="small"
+                  icon={<SoundOutlined />}
+                  onClick={() => handleAlertSound(record)}
                 />
               </Tooltip>
               <Popconfirm
@@ -491,6 +530,7 @@ function Drivers() {
           <Input.Search
             allowClear
             placeholder="Tìm theo tên, SĐT, số bằng lái, email"
+            defaultValue={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ width: 320 }}
           />

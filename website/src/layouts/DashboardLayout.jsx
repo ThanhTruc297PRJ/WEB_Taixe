@@ -1,12 +1,13 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
-import { App, Button, Layout, Spin } from 'antd'
-import { WarningFilled } from '@ant-design/icons'
+import { App, Button, Layout, Space, Spin } from 'antd'
+import { SoundOutlined, WarningFilled } from '@ant-design/icons'
 import { Outlet, useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { useIncidentAlerts } from '../hooks/useIncidentAlerts'
 import { playAlarm, unlockAudio } from '../services/alertSound'
+import { sendAlertSound } from '../services/drivers'
 import { DriversProvider } from '../contexts/DriversContext'
 
 const { Content } = Layout
@@ -20,8 +21,25 @@ const SEVERITY_TEXT = {
 function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [notificationsRefreshSignal, setNotificationsRefreshSignal] = useState(0)
-  const { notification } = App.useApp()
+  const { notification, message } = App.useApp()
   const navigate = useNavigate()
+
+  const handleAlertSound = useCallback(
+    async (alert) => {
+      if (!alert.driver_id) return
+      try {
+        const result = await sendAlertSound(alert.driver_id)
+        if (result.sent) {
+          message.success(`Đã gửi cảnh báo tới ${alert.driver_name ?? 'tài xế'}`)
+        } else {
+          message.warning(`Không gửi được: ${result.reason}`)
+        }
+      } catch (e) {
+        message.error(e.message)
+      }
+    },
+    [message],
+  )
 
   // Mở khoá âm thanh khi người dùng tương tác lần đầu (trình duyệt chặn autoplay).
   useEffect(() => {
@@ -49,21 +67,30 @@ function DashboardLayout() {
         duration: 0,
         key: alert.incident_id ?? undefined,
         btn: (
-          <Button
-            type="primary"
-            danger
-            size="small"
-            onClick={() => {
-              notification.destroy(alert.incident_id ?? undefined)
-              navigate('/incidents')
-            }}
-          >
-            Xem chi tiết
-          </Button>
+          <Space>
+            <Button
+              size="small"
+              icon={<SoundOutlined />}
+              onClick={() => handleAlertSound(alert)}
+            >
+              Phát loa cảnh báo
+            </Button>
+            <Button
+              type="primary"
+              danger
+              size="small"
+              onClick={() => {
+                notification.destroy(alert.incident_id ?? undefined)
+                navigate('/incidents')
+              }}
+            >
+              Xem chi tiết
+            </Button>
+          </Space>
         ),
       })
     },
-    [notification, navigate],
+    [notification, navigate, handleAlertSound],
   )
 
   const { connected } = useIncidentAlerts(handleAlert)

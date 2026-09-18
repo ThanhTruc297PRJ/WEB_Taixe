@@ -146,7 +146,7 @@ function Header({ collapsed, onToggle, wsConnected, notificationsRefreshSignal }
   )
 
   return (
-    <AntHeader className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6">
+    <AntHeader className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-6">
       <div className="flex items-center gap-4">
         <CollapseIcon
           className="cursor-pointer text-lg text-slate-500 transition-colors hover:text-slate-800"
@@ -154,7 +154,7 @@ function Header({ collapsed, onToggle, wsConnected, notificationsRefreshSignal }
           role="button"
           aria-label="Thu gọn menu"
         />
-        <span className="text-base font-semibold text-slate-800">
+        <span className="whitespace-nowrap text-base font-semibold text-slate-800">
           {navTitle(pathname)}
         </span>
       </div>
@@ -166,13 +166,17 @@ function Header({ collapsed, onToggle, wsConnected, notificationsRefreshSignal }
               : 'Mất kết nối cảnh báo realtime'
           }
         >
-          <span className="flex items-center gap-1.5 text-xs text-slate-400">
+          <span
+            className={`hidden items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium sm:flex ${
+              wsConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'
+            }`}
+          >
             <span
-              className={`inline-block h-2 w-2 rounded-full ${
+              className={`inline-block h-1.5 w-1.5 rounded-full ${
                 wsConnected ? 'bg-emerald-500' : 'bg-slate-300'
               }`}
             />
-            Realtime
+            Đồng bộ Realtime: {wsConnected ? 'Bật' : 'Mất kết nối'}
           </span>
         </Tooltip>
         <Popover

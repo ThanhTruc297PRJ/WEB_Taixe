@@ -25,6 +25,13 @@ service firebase.storage {
         && request.auth.token.admin == true;
     }
 
+    // Ảnh đại diện tài xế: chỉ chính chủ (đúng uid, không cần claim admin —
+    // tài khoản tài xế) mới ghi được vào thư mục của mình. Đọc công khai.
+    match /driver_avatars/{uid}/{file} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

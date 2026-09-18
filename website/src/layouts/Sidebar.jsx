@@ -1,63 +1,139 @@
-import { Badge, Layout, Menu } from 'antd'
+import { useEffect, useState } from 'react'
+import { Avatar, Badge, Layout, Menu, Tooltip } from 'antd'
 import { SafetyCertificateFilled } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useDrivers } from '../contexts/useDrivers'
+import { useAuth } from '../contexts/useAuth'
+import { useAdminNotifications } from '../hooks/useAdminNotifications'
+import { listVehicles } from '../services/vehicles'
+import { initials, avatarColor } from '../utils/avatar'
 import { NAV_SECTIONS } from './navConfig'
 
 const { Sider } = Layout
 
+function badgeFor({ key, driversTotal, pendingCount, attention, vehicleCount }) {
+  switch (key) {
+    case '/drivers':
+      return driversTotal > 0
+        ? { count: driversTotal, color: pendingCount > 0 ? '#f59e0b' : '#475569' }
+        : null
+    case '/incidents': {
+      const c = attention.recent_incidents.count
+      return c > 0 ? { count: `${c} Mới`, color: '#dc2626' } : null
+    }
+    case '/vehicles':
+      return vehicleCount > 0 ? { count: `${vehicleCount} xe`, color: '#475569' } : null
+    case '/maintenance':
+      return attention.maintenance_due.count > 0 ? { dot: true, color: '#f59e0b' } : null
+    case '/inspections':
+      return attention.inspections_due.count > 0 ? { dot: true, color: '#f59e0b' } : null
+    case '/music':
+      return attention.reported_music.count > 0 ? { dot: true, color: '#dc2626' } : null
+    default:
+      return null
+  }
+}
+
 function Sidebar({ collapsed }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { pendingCount } = useDrivers()
+  const { drivers, pendingCount } = useDrivers()
+  const { user } = useAuth()
+  const { data: attention } = useAdminNotifications()
+  const [vehicleCount, setVehicleCount] = useState(0)
+
+  useEffect(() => {
+    listVehicles()
+      .then((v) => setVehicleCount(v.length))
+      .catch(() => {
+        /* badge số xe chỉ hiện — không chặn sidebar nếu tải lỗi */
+      })
+  }, [])
 
   const menuItems = NAV_SECTIONS.map((section) => ({
     key: section.label,
     type: 'group',
     label: collapsed ? '' : section.label.toUpperCase(),
-    children: section.items.map((item) => ({
-      key: item.key,
-      icon: item.icon,
-      label:
-        item.key === '/drivers' && pendingCount > 0 ? (
+    children: section.items.map((item) => {
+      const b = badgeFor({
+        key: item.key,
+        driversTotal: drivers.length,
+        pendingCount,
+        attention,
+        vehicleCount,
+      })
+      return {
+        key: item.key,
+        icon: item.icon,
+        label: b ? (
           <span className="flex items-center justify-between">
             {item.label}
-            <Badge count={pendingCount} size="small" />
+            {b.dot ? (
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: b.color }}
+              />
+            ) : (
+              <Badge count={b.count} color={b.color} size="small" />
+            )}
           </span>
         ) : (
           item.label
         ),
-    })),
+      }
+    }),
   }))
 
+  const displayLabel = user?.displayName || user?.email || 'Admin'
+
   return (
-    <Sider
-      trigger={null}
-      collapsible
-      collapsed={collapsed}
-      width={232}
-      collapsedWidth={72}
-    >
-      <div className="flex h-[60px] items-center gap-2.5 px-4 text-white">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-lg">
-          <SafetyCertificateFilled />
-        </span>
-        {!collapsed && (
-          <div className="overflow-hidden whitespace-nowrap leading-tight">
-            <div className="text-[15px] font-bold">Driver Monitor</div>
-            <div className="text-[11px] text-slate-400">Bảng điều khiển</div>
-          </div>
-        )}
+    <Sider trigger={null} collapsible collapsed={collapsed} width={232} collapsedWidth={72}>
+      <div className="flex h-full flex-col">
+        <div className="flex h-[60px] shrink-0 items-center gap-2.5 px-4 text-white">
+          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-lg">
+            <SafetyCertificateFilled />
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#001529] bg-emerald-400" />
+          </span>
+          {!collapsed && (
+            <div className="overflow-hidden whitespace-nowrap leading-tight">
+              <div className="text-[15px] font-bold">DriverMonitor</div>
+              <div className="text-[10px] tracking-wide text-slate-400">Bảng điều khiển</div>
+            </div>
+          )}
+        </div>
+        <div className="mx-3 mb-2 border-t border-white/10" />
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={[location.pathname]}
+          items={menuItems}
+          onClick={({ key }) => navigate(key)}
+          style={{ background: 'transparent', borderInlineEnd: 'none', flex: 1, overflowY: 'auto' }}
+        />
+        <div className="mx-3 mt-2 border-t border-white/10" />
+        <div className="shrink-0 p-3">
+          <Tooltip title={collapsed ? `${displayLabel} · ${user?.email ?? ''}` : ''} placement="right">
+            <div className="flex items-center gap-2.5 rounded-lg bg-white/5 p-2">
+              <Avatar
+                size={32}
+                src={user?.photoURL || undefined}
+                style={user?.photoURL ? undefined : { backgroundColor: avatarColor(user?.email) }}
+              >
+                {!user?.photoURL && initials(displayLabel)}
+              </Avatar>
+              {!collapsed && (
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="truncate text-xs font-medium text-white">{displayLabel}</div>
+                  <div className="truncate text-[10px] text-slate-400">{user?.email}</div>
+                </div>
+              )}
+              {!collapsed && (
+                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+              )}
+            </div>
+          </Tooltip>
+        </div>
       </div>
-      <div className="mx-3 mb-2 border-t border-white/10" />
-      <Menu
-        theme="dark"
-        mode="inline"
-        selectedKeys={[location.pathname]}
-        items={menuItems}
-        onClick={({ key }) => navigate(key)}
-        style={{ background: 'transparent', borderInlineEnd: 'none' }}
-      />
     </Sider>
   )
 }

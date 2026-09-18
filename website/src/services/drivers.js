@@ -14,3 +14,7 @@ export const unlockDriver = (id) => apiPut(`/drivers/${id}/unlock`)
 // Đặt lại mật khẩu (hỗ trợ tài xế quên mật khẩu, không vào được email) — trả
 // {temp_password} chỉ hiện đúng 1 lần.
 export const resetDriverPassword = (id) => apiPost(`/drivers/${id}/reset-password`)
+
+// Đẩy FCM cho app tài xế tự phát âm thanh cảnh báo ngay (dù đang nền) — trả
+// {sent, reason}.
+export const sendAlertSound = (id) => apiPost(`/drivers/${id}/alert-sound`)

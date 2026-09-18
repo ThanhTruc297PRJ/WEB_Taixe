@@ -17,7 +17,7 @@ export const NAV_SECTIONS = [
     items: [
       { key: '/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan' },
       { key: '/drivers', icon: <TeamOutlined />, label: 'Quản lý tài xế' },
-      { key: '/incidents', icon: <WarningOutlined />, label: 'Sự cố' },
+      { key: '/incidents', icon: <WarningOutlined />, label: 'Sự cố an toàn' },
     ],
   },
   {

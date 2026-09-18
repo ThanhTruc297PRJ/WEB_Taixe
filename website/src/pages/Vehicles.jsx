@@ -2,18 +2,24 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   App,
   Button,
+  Card,
+  Col,
+  Empty,
   Form,
   Input,
   InputNumber,
   Modal,
   Popconfirm,
+  Row,
   Select,
   Space,
-  Table,
   Tag,
 } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, ToolOutlined } from '@ant-design/icons'
+import { useLocation, useNavigate } from 'react-router-dom'
+import dayjs from 'dayjs'
 import { listDrivers } from '../services/drivers'
+import { listMaintenance } from '../services/maintenance'
 import {
   createVehicle,
   deleteVehicle,
@@ -28,17 +34,21 @@ const STATUS_OPTIONS = [
   { value: 'inactive', label: 'Ngừng sử dụng' },
 ]
 
-const STATUS_COLOR = { active: 'green', maintenance: 'orange', inactive: 'default' }
+const STATUS_DOT = { active: 'bg-emerald-400', maintenance: 'bg-amber-400', inactive: 'bg-slate-300' }
 
 const statusLabel = (value) =>
   STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value
 
 function Vehicles() {
   const { message } = App.useApp()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [rows, setRows] = useState([])
   const [drivers, setDrivers] = useState([])
+  const [maintenance, setMaintenance] = useState([])
   const [loading, setLoading] = useState(false)
-  const [search, setSearch] = useState('')
+  // Điền sẵn từ khoá khi điều hướng tới từ ô tìm nhanh trên Header.
+  const [search, setSearch] = useState(location.state?.initialSearch || '')
   const [statusFilter, setStatusFilter] = useState('all')
   const [driverFilter, setDriverFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
@@ -49,12 +59,14 @@ function Vehicles() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [vehicleList, driverList] = await Promise.all([
+      const [vehicleList, driverList, maintenanceList] = await Promise.all([
         listVehicles(),
         listDrivers(),
+        listMaintenance(),
       ])
       setRows(vehicleList)
       setDrivers(driverList)
+      setMaintenance(maintenanceList)
     } catch (e) {
       message.error(e.message)
     } finally {
@@ -72,6 +84,19 @@ function Vehicles() {
     for (const d of drivers) map[d.id] = d.name
     return map
   }, [drivers])
+
+  // Lịch bảo trì GẦN NHẤT còn chờ tới hạn của mỗi xe — để hiện trên thẻ.
+  const nextMaintenanceByVehicle = useMemo(() => {
+    const map = {}
+    for (const m of maintenance) {
+      if (m.status !== 'pending' || !m.vehicle_id || !m.scheduled_date) continue
+      const current = map[m.vehicle_id]
+      if (!current || dayjs(m.scheduled_date).isBefore(dayjs(current.scheduled_date))) {
+        map[m.vehicle_id] = m
+      }
+    }
+    return map
+  }, [maintenance])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -149,61 +174,14 @@ function Vehicles() {
     }
   }
 
-  const columns = [
-    { title: 'Biển số', dataIndex: 'plate_number' },
-    { title: 'Hãng', dataIndex: 'brand' },
-    { title: 'Dòng xe', dataIndex: 'model' },
-    { title: 'Năm SX', dataIndex: 'year', render: (y) => y || '—' },
-    {
-      title: 'Số km hiện tại',
-      dataIndex: 'current_odometer_km',
-      render: (v) => (v == null ? '—' : `${v.toLocaleString('vi-VN')} km`),
-    },
-    {
-      title: 'Tài xế phụ trách',
-      dataIndex: 'driver_id',
-      render: (id) => driverName[id] || '—',
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      render: (value) => {
-        const status = value ?? 'active'
-        return <Tag color={STATUS_COLOR[status]}>{statusLabel(status)}</Tag>
-      },
-    },
-    {
-      title: '',
-      key: 'actions',
-      width: 150,
-      render: (_, record) => (
-        <Space>
-          <Button size="small" onClick={() => openEdit(record)}>
-            Sửa
-          </Button>
-          <Popconfirm
-            title="Xoá xe này?"
-            okText="Xoá"
-            cancelText="Huỷ"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button size="small" danger>
-              Xoá
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ]
-
   return (
     <div>
       <PageHeader
         title="Danh mục xe"
-        subtitle="Quản lý đội xe và phân công tài xế"
+        subtitle="Theo dõi tài xế phụ trách, số KM và lịch bảo trì định kỳ"
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            Thêm xe
+            Thêm phương tiện
           </Button>
         }
       />
@@ -212,6 +190,7 @@ function Vehicles() {
         <Input.Search
           allowClear
           placeholder="Tìm theo biển số, hãng, dòng xe"
+          defaultValue={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ width: 280 }}
         />
@@ -238,13 +217,91 @@ function Vehicles() {
         />
       </Space>
 
-      <Table
-        rowKey="id"
-        loading={loading}
-        columns={columns}
-        dataSource={filtered}
-        pagination={{ pageSize: 10, showSizeChanger: false }}
-      />
+      {!loading && filtered.length === 0 ? (
+        <Card>
+          <Empty description="Không tìm thấy xe nào" />
+        </Card>
+      ) : (
+        <Row gutter={[16, 16]}>
+          {filtered.map((record) => {
+            const status = record.status ?? 'active'
+            const nextMaintenance = nextMaintenanceByVehicle[record.id]
+            const dueSoon =
+              nextMaintenance &&
+              dayjs(nextMaintenance.scheduled_date).diff(dayjs(), 'day') <= 7
+            return (
+              <Col key={record.id} xs={24} sm={12} lg={8} xl={6}>
+                <Card loading={loading} className="h-full" styles={{ body: { padding: 18 } }}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <Tag bordered={false} className="rounded-full px-2.5 py-0.5">
+                      {record.plate_number}
+                    </Tag>
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT[status]}`}
+                      title={statusLabel(status)}
+                    />
+                  </div>
+                  <div className="text-base font-semibold text-slate-800">
+                    {record.brand} {record.model}
+                  </div>
+                  <div className="mb-3 text-xs text-slate-400">{record.year || '—'}</div>
+
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Tài xế</span>
+                      <span className="font-medium text-slate-700">
+                        {driverName[record.driver_id] || 'Chưa phân công'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Số KM hiện tại</span>
+                      <span className="font-medium text-slate-700">
+                        {record.current_odometer_km == null
+                          ? '—'
+                          : `${record.current_odometer_km.toLocaleString('vi-VN')} km`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Hạn bảo trì</span>
+                      <span
+                        className={`font-medium ${dueSoon ? 'text-amber-600' : 'text-slate-700'}`}
+                      >
+                        {nextMaintenance
+                          ? dayjs(nextMaintenance.scheduled_date).format('DD/MM/YYYY')
+                          : 'Chưa có lịch'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      size="small"
+                      icon={<ToolOutlined />}
+                      className="flex-1"
+                      onClick={() => navigate('/maintenance')}
+                    >
+                      Lịch sử
+                    </Button>
+                    <Button size="small" type="primary" className="flex-1" onClick={() => openEdit(record)}>
+                      Quản lý
+                    </Button>
+                    <Popconfirm
+                      title="Xoá xe này?"
+                      okText="Xoá"
+                      cancelText="Huỷ"
+                      onConfirm={() => handleDelete(record.id)}
+                    >
+                      <Button size="small" danger>
+                        Xoá
+                      </Button>
+                    </Popconfirm>
+                  </div>
+                </Card>
+              </Col>
+            )
+          })}
+        </Row>
+      )}
 
       <Modal
         open={modalOpen}
@@ -254,6 +311,7 @@ function Vehicles() {
         onCancel={() => setModalOpen(false)}
         okText="Lưu"
         cancelText="Huỷ"
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 } }}
         destroyOnHidden
       >
         <Form form={form} layout="vertical">

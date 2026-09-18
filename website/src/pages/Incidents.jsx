@@ -2,15 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   App,
   Button,
+  Card,
+  Col,
   Descriptions,
   Empty,
   Modal,
+  Row,
   Select,
   Space,
   Table,
   Tag,
 } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import { PrinterOutlined, ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../services/firebase'
@@ -19,6 +22,7 @@ import { getSettings } from '../services/settings'
 import { useDrivers } from '../contexts/useDrivers'
 import { toDate } from '../utils/firestore'
 import PageHeader from '../components/PageHeader'
+import { PrintableReport, triggerPrint } from '../components/PrintableReport'
 
 const TYPE_META = {
   drowsiness: { label: 'Buồn ngủ', color: 'gold' },
@@ -183,6 +187,14 @@ function Incidents() {
     [filtered],
   )
 
+  const reportColumns = [
+    { key: 'time', label: 'Thời gian', value: (r) => dayjs(toDate(r.detected_at) ?? r.detected_at).format('DD/MM/YYYY HH:mm') },
+    { key: 'driver', label: 'Tài xế', value: (r) => driverName[r.driver_id] || r.driver_id },
+    { key: 'type', label: 'Loại', value: (r) => typeLabel(r.type) },
+    { key: 'points', label: 'Điểm', value: (r) => r.points ?? 0 },
+    { key: 'confidence', label: 'Độ tin cậy', value: (r) => (r.confidence == null ? '—' : `${Math.round(r.confidence * 100)}%`) },
+  ]
+
   const columns = [
     {
       title: 'Thời gian ghi nhận',
@@ -227,11 +239,61 @@ function Incidents() {
         title="Báo cáo sự cố"
         subtitle="Lịch sử cảnh báo buồn ngủ, mất tập trung theo tài xế"
         extra={
-          <Button icon={<ReloadOutlined />} onClick={reloadOnce}>
-            Làm mới
-          </Button>
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={reloadOnce}>
+              Làm mới
+            </Button>
+            <Button
+              icon={<PrinterOutlined />}
+              onClick={triggerPrint}
+              disabled={filtered.length === 0}
+            >
+              Xuất báo cáo PDF
+            </Button>
+          </Space>
         }
       />
+
+      <Row gutter={[16, 16]} className="mb-4">
+        {[
+          {
+            key: 'reminder',
+            label: 'Mức 1: Nhắc nhở',
+            desc: 'Tổng điểm vi phạm của tài xế chạm mốc này',
+            color: '#faad14',
+            bg: '#fffbe6',
+          },
+          {
+            key: 'warning',
+            label: 'Mức 2: Cảnh cáo',
+            desc: 'Admin nên chủ động liên hệ nhắc nhở tài xế',
+            color: '#fa8c16',
+            bg: '#fff7e6',
+          },
+          {
+            key: 'suspend',
+            label: 'Mức 3: Đình chỉ tạm thời',
+            desc: 'Cân nhắc tạm khoá tài khoản để đảm bảo an toàn',
+            color: '#f5222d',
+            bg: '#fff1f0',
+          },
+        ].map((tier) => (
+          <Col key={tier.key} xs={24} sm={8}>
+            <Card
+              styles={{ body: { padding: 16, background: tier.bg } }}
+              style={{ borderColor: tier.color, borderWidth: 1 }}
+            >
+              <div className="text-xs font-semibold" style={{ color: tier.color }}>
+                {tier.label.toUpperCase()}
+              </div>
+              <div className="mt-1 text-2xl font-bold text-slate-800">
+                {thresholds[tier.key]} điểm
+              </div>
+              <div className="mt-1 text-xs text-slate-500">{tier.desc}</div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
 
       <MilestoneBar points={totalPoints} thresholds={thresholds} />
 
@@ -263,6 +325,13 @@ function Incidents() {
         columns={columns}
         dataSource={filtered}
         pagination={{ pageSize: 10, showSizeChanger: false }}
+      />
+
+      <PrintableReport
+        title="Báo cáo sự cố an toàn"
+        subtitle={`Tổng điểm vi phạm: ${totalPoints} · ${filtered.length} sự cố`}
+        columns={reportColumns}
+        rows={filtered}
       />
 
       <Modal
