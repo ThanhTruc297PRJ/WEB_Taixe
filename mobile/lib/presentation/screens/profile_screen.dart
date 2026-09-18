@@ -1,12 +1,62 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../viewmodels/auth_view_model.dart';
+import '../../services/driver_api.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _driverApi = DriverApi();
+  bool _uploadingPhoto = false;
+
+  /// Chọn ảnh từ thư viện -> upload lên Firebase Storage (client-side, giống
+  /// cách web admin đang làm cho tài khoản admin) -> lưu URL vào hồ sơ qua
+  /// backend -> nạp lại hồ sơ để hiện ảnh mới ngay.
+  Future<void> _pickAndUploadPhoto() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1080,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    setState(() => _uploadingPhoto = true);
+    try {
+      final ref = FirebaseStorage.instance.ref(
+        'driver_avatars/$uid/${DateTime.now().millisecondsSinceEpoch}_${picked.name}',
+      );
+      await ref.putFile(File(picked.path));
+      final url = await ref.getDownloadURL();
+      await _driverApi.updatePhoto(uid, url);
+      if (mounted) {
+        await context.read<AuthViewModel>().refreshAccount(force: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không tải được ảnh: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,24 +89,38 @@ class ProfileScreen extends StatelessWidget {
                               width: 2,
                             ),
                           ),
-                          child: const CircleAvatar(
+                          child: CircleAvatar(
                             radius: 50,
                             backgroundColor: Colors.white,
                             backgroundImage: NetworkImage(
-                              'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+                              account?.photoUrl ??
+                                  'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
                             ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFD32F2F),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            FluentIcons.camera_24_regular,
-                            color: Colors.white,
-                            size: 16,
+                        Material(
+                          color: const Color(0xFFD32F2F),
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: _uploadingPhoto
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      FluentIcons.camera_24_regular,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                            ),
                           ),
                         ),
                       ],

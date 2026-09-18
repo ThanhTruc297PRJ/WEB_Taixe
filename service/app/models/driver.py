@@ -18,6 +18,15 @@ class DriverBase(BaseModel):
     # Đồng bộ từ Firebase Auth (nguồn sự thật là Auth, đây chỉ là cache để web
     # admin xem nhanh) — xem driver_service.sync_email_verified.
     email_verified: bool = False
+    # Tài xế tự upload từ app (Firebase Storage) rồi gọi PUT .../photo để lưu
+    # URL vào đây — web admin đọc thẳng field này, không cần gọi Firebase Auth
+    # Admin SDK riêng cho từng dòng khi hiển thị danh sách.
+    photo_url: Optional[str] = None
+    # App gửi định kỳ CHỈ KHI đang mở ở foreground (không theo dõi nền) — xem
+    # driver_service.set_speed. speed_updated_at để web tự biết dữ liệu đã cũ
+    # (tài xế tắt app) và ẩn đi thay vì hiện số liệu sai lệch mãi mãi.
+    current_speed_kmh: Optional[float] = None
+    speed_updated_at: Optional[datetime] = None
 
 
 class DriverCreate(DriverBase):

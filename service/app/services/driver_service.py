@@ -6,7 +6,7 @@ from firebase_admin import auth as firebase_auth
 
 from app.core.firebase import db
 from app.models.driver import DriverCreate, DriverRegister
-from app.services import email_service
+from app.services import email_service, notification_service
 
 COLLECTION = "drivers"
 
@@ -195,6 +195,52 @@ def set_fcm_token(driver_id: str, token: str) -> Optional[dict]:
     if not doc_ref.get().exists:
         return None
     doc_ref.update({"fcm_token": token})
+    return {"id": driver_id, **doc_ref.get().to_dict()}
+
+
+def set_speed(driver_id: str, speed_kmh: float) -> Optional[dict]:
+    """App gọi định kỳ CHỈ KHI đang mở ở foreground (quyết định có chủ đích —
+    không theo dõi nền để đỡ tốn pin và tôn trọng quyền riêng tư tài xế)."""
+    doc_ref = db.collection(COLLECTION).document(driver_id)
+    if not doc_ref.get().exists:
+        return None
+    doc_ref.update(
+        {"current_speed_kmh": max(0.0, speed_kmh), "speed_updated_at": _now()}
+    )
+    return {"id": driver_id, **doc_ref.get().to_dict()}
+
+
+def send_alert_sound(driver_id: str) -> dict:
+    """Admin bấm "Phát loa cảnh báo" trên web -> đẩy FCM tới app tài xế; app
+    nhận data `type=play_alert_sound` thì tự phát âm thanh cảnh báo local
+    (AlertService, có sẵn từ luồng phát hiện buồn ngủ) — hoạt động cả khi
+    app đang nền. Trả {"sent": bool, "reason": str}, không raise, để route
+    trả 200 kèm lý do (chưa có token...) cho UI hiển thị."""
+    driver = get_driver(driver_id)
+    if driver is None:
+        return {"sent": False, "reason": "driver_not_found"}
+    token = driver.get("fcm_token")
+    if not token:
+        return {"sent": False, "reason": "driver_has_no_fcm_token"}
+    try:
+        notification_service.send_push(
+            token=token,
+            title="Cảnh báo từ quản trị viên",
+            body="Vui lòng chú ý quan sát và lái xe an toàn.",
+            data={"type": "play_alert_sound"},
+        )
+    except Exception as e:
+        return {"sent": False, "reason": f"push_failed: {e}"}
+    return {"sent": True, "reason": "ok"}
+
+
+def set_photo_url(driver_id: str, photo_url: str) -> Optional[dict]:
+    """Tài xế tự upload ảnh lên Firebase Storage xong (client-side, giống
+    cách admin đang làm ở web) thì gọi hàm này lưu URL vào hồ sơ."""
+    doc_ref = db.collection(COLLECTION).document(driver_id)
+    if not doc_ref.get().exists:
+        return None
+    doc_ref.update({"photo_url": photo_url})
     return {"id": driver_id, **doc_ref.get().to_dict()}
 
 

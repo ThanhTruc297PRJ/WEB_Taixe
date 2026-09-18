@@ -85,6 +85,43 @@ def update_fcm_token(
     return driver
 
 
+class PhotoUpdate(BaseModel):
+    photo_url: str
+
+
+@self_router.put("/{driver_id}/photo")
+def update_photo(
+    driver_id: str,
+    payload: PhotoUpdate,
+    user: dict = Depends(get_current_active_driver),
+):
+    if user["uid"] != driver_id:
+        raise HTTPException(status_code=403, detail="Không thể sửa tài xế khác")
+    driver = driver_service.set_photo_url(driver_id, payload.photo_url)
+    if driver is None:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    return driver
+
+
+class SpeedUpdate(BaseModel):
+    speed_kmh: float
+
+
+@self_router.put("/{driver_id}/speed")
+def update_speed(
+    driver_id: str,
+    payload: SpeedUpdate,
+    user: dict = Depends(get_current_active_driver),
+):
+    """App gọi định kỳ CHỈ KHI đang mở ở foreground — xem driver_service.set_speed."""
+    if user["uid"] != driver_id:
+        raise HTTPException(status_code=403, detail="Không thể sửa tài xế khác")
+    driver = driver_service.set_speed(driver_id, payload.speed_kmh)
+    if driver is None:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    return driver
+
+
 # ── Web admin ────────────────────────────────────────────────────────────
 @router.get("/")
 def list_drivers():
@@ -148,6 +185,15 @@ def unlock_driver(driver_id: str):
     if driver is None:
         raise HTTPException(status_code=404, detail="Driver not found")
     return driver
+
+
+@router.post("/{driver_id}/alert-sound")
+def send_alert_sound(driver_id: str):
+    """Đẩy FCM cho app tài xế tự phát âm thanh cảnh báo ngay (dù đang nền)."""
+    result = driver_service.send_alert_sound(driver_id)
+    if result["reason"] == "driver_not_found":
+        raise HTTPException(status_code=404, detail="Driver not found")
+    return result
 
 
 @router.post("/{driver_id}/reset-password")

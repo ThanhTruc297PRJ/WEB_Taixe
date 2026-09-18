@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +8,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:animate_do/animate_do.dart';
 
 import 'firebase_options.dart';
+import 'services/fcm_service.dart';
 import 'presentation/viewmodels/auth_view_model.dart';
 import 'presentation/viewmodels/monitoring_view_model.dart';
 import 'presentation/viewmodels/music_view_model.dart';
@@ -27,6 +29,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   runApp(
     MultiProvider(
       providers: [
@@ -116,6 +119,17 @@ class _MainScreenState extends State<MainScreen> {
     'Giải Trí An Toàn',
     'Tài Khoản Cá Nhân',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Vào tới đây nghĩa là hồ sơ đã active (GateState.ready) -> đăng ký nhận
+    // thông báo đẩy (nhắc lịch, cảnh báo sự cố, lệnh phát loa từ admin...).
+    final driverId = context.read<AuthViewModel>().account?.id;
+    if (driverId != null) {
+      FcmService().init(driverId);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

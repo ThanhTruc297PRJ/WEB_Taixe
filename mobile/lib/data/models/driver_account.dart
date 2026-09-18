@@ -25,6 +25,7 @@ class DriverAccount {
     required this.status,
     required this.emailVerified,
     this.rejectReason,
+    this.photoUrl,
   });
 
   final String id;
@@ -36,6 +37,7 @@ class DriverAccount {
   // driver_service.sync_email_verified ở backend.
   final bool emailVerified;
   final String? rejectReason;
+  final String? photoUrl;
 
   factory DriverAccount.fromJson(Map<String, dynamic> j) => DriverAccount(
         id: j['id'] as String,
@@ -45,5 +47,6 @@ class DriverAccount {
         status: _parseStatus(j['status'] as String?),
         emailVerified: j['email_verified'] as bool? ?? false,
         rejectReason: j['reject_reason'] as String?,
+        photoUrl: j['photo_url'] as String?,
       );
 }

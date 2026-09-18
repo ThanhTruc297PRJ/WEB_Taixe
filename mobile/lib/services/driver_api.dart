@@ -37,4 +37,21 @@ class DriverApi {
     );
     return (j as Map<String, dynamic>)['exists'] == true;
   }
+
+  /// Lưu URL ảnh đại diện — gọi sau khi đã tự upload file lên Firebase
+  /// Storage (client-side, giống cách web admin làm cho tài khoản admin).
+  Future<DriverAccount> updatePhoto(String driverId, String photoUrl) async {
+    final j = await _c.put('/drivers/$driverId/photo', {'photo_url': photoUrl});
+    return DriverAccount.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// Đăng ký token nhận thông báo đẩy (FCM) — để admin gửi được nhắc lịch,
+  /// cảnh báo sự cố, lệnh phát loa cảnh báo từ xa... tới đúng máy này.
+  Future<void> updateFcmToken(String driverId, String token) =>
+      _c.put('/drivers/$driverId/fcm-token', {'fcm_token': token});
+
+  /// Báo tốc độ hiện tại lên web admin — CHỈ gọi khi app đang mở ở
+  /// foreground (quyết định có chủ đích, không theo dõi nền).
+  Future<void> updateSpeed(String driverId, double speedKmh) =>
+      _c.put('/drivers/$driverId/speed', {'speed_kmh': speedKmh});
 }
