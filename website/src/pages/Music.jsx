@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   App,
@@ -19,6 +19,8 @@ import {
   SoundOutlined,
   StopOutlined,
   FlagOutlined,
+  PlayCircleFilled,
+  PauseCircleFilled,
 } from '@ant-design/icons'
 import PageHeader from '../components/PageHeader'
 import { useMusicRealtime } from '../hooks/useMusicRealtime'
@@ -57,6 +59,34 @@ function Music() {
   const [filter, setFilter] = useState('all')
   const [disableTarget, setDisableTarget] = useState(null)
   const [reason, setReason] = useState('')
+  const [playingId, setPlayingId] = useState(null)
+  const audioRef = useRef(null)
+
+  useEffect(() => {
+    const audio = new Audio()
+    audio.addEventListener('ended', () => setPlayingId(null))
+    audioRef.current = audio
+    return () => {
+      audio.pause()
+      audio.src = ''
+    }
+  }, [])
+
+  const togglePreview = (track) => {
+    const audio = audioRef.current
+    if (!audio || !track.preview_url) {
+      message.warning('Bài này không có bản nghe thử')
+      return
+    }
+    if (playingId === track.id) {
+      audio.pause()
+      setPlayingId(null)
+      return
+    }
+    audio.src = track.preview_url
+    audio.play().catch(() => message.error('Không phát được bản nghe thử'))
+    setPlayingId(track.id)
+  }
 
   useEffect(() => {
     if (!error) return
@@ -127,31 +157,44 @@ function Music() {
     {
       title: 'Bài hát',
       dataIndex: 'title',
-      render: (title, t) => (
-        <div className="flex items-center gap-3">
-          <Avatar
-            shape="square"
-            size={40}
-            src={t.artwork_url}
-            icon={<CustomerServiceOutlined />}
-          />
-          <div className="leading-tight">
-            <div className="font-medium text-slate-800">
-              {title}
-              {t.explicit && (
-                <Tag
-                  color="volcano"
-                  bordered={false}
-                  className="ml-2 rounded px-1 text-[10px]"
-                >
-                  EXPLICIT
-                </Tag>
-              )}
+      render: (title, t) => {
+        const isPlaying = playingId === t.id
+        return (
+          <div className="flex items-center gap-3">
+            <Tooltip title={isPlaying ? 'Dừng nghe thử' : 'Nghe thử (30s)'}>
+              <button
+                type="button"
+                onClick={() => togglePreview(t)}
+                className="shrink-0 text-2xl text-blue-500 transition-colors hover:text-blue-600 disabled:text-slate-300"
+                disabled={!t.preview_url}
+              >
+                {isPlaying ? <PauseCircleFilled /> : <PlayCircleFilled />}
+              </button>
+            </Tooltip>
+            <Avatar
+              shape="square"
+              size={40}
+              src={t.artwork_url}
+              icon={<CustomerServiceOutlined />}
+            />
+            <div className="leading-tight">
+              <div className="font-medium text-slate-800">
+                {title}
+                {t.explicit && (
+                  <Tag
+                    color="volcano"
+                    bordered={false}
+                    className="ml-2 rounded px-1 text-[10px]"
+                  >
+                    EXPLICIT
+                  </Tag>
+                )}
+              </div>
+              <div className="text-xs text-slate-400">{t.artist}</div>
             </div>
-            <div className="text-xs text-slate-400">{t.artist}</div>
           </div>
-        </div>
-      ),
+        )
+      },
     },
     {
       title: 'Lượt phát',
