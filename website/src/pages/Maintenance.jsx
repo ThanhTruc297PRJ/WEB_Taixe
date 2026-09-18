@@ -17,6 +17,7 @@ import { BellOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { listVehicles } from '../services/vehicles'
 import { listDrivers } from '../services/drivers'
+import { getSettings } from '../services/settings'
 import {
   createMaintenance,
   deleteMaintenance,
@@ -63,7 +64,19 @@ function Maintenance() {
   const [saving, setSaving] = useState(false)
   const [notifyingId, setNotifyingId] = useState(null)
   const [scanning, setScanning] = useState(false)
+  const [reminderDefaults, setReminderDefaults] = useState({
+    remind_days_before: 7,
+    remind_km_before: 500,
+  })
   const [form] = Form.useForm()
+
+  useEffect(() => {
+    getSettings()
+      .then((s) => setReminderDefaults(s.maintenance_defaults))
+      .catch(() => {
+        /* giữ mặc định cứng nếu tải cấu hình lỗi */
+      })
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -132,8 +145,8 @@ function Maintenance() {
     form.setFieldsValue({
       type: 'oil_change',
       status: 'pending',
-      remind_days_before: 7,
-      remind_km_before: 500,
+      remind_days_before: reminderDefaults.remind_days_before,
+      remind_km_before: reminderDefaults.remind_km_before,
     })
     setModalOpen(true)
   }

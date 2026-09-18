@@ -5,7 +5,7 @@ from typing import Optional
 
 from app.core.firebase import bucket, db
 from app.models.incident import IncidentCreate
-from app.services import driver_service, notification_service
+from app.services import app_settings_service, driver_service, notification_service
 from app.services.websocket_manager import manager
 
 COLLECTION = "incidents"
@@ -15,9 +15,13 @@ _ALLOWED_TYPES = {"drowsiness", "distraction"}
 
 
 def _severity(points: int) -> str:
-    if points >= 30:
+    # Ngưỡng đọc từ Cài đặt (trang web admin) thay vì hard-code — admin tự
+    # chỉnh theo chính sách công ty, không cần sửa code. "reminder" chỉ dùng
+    # cho mốc hiển thị lũy kế ở frontend, severity theo sự cố chỉ có 3 mức.
+    thresholds = app_settings_service.get_violation_thresholds()
+    if points >= thresholds["suspend"]:
         return "critical"
-    if points >= 22:
+    if points >= thresholds["warning"]:
         return "high"
     return "medium"
 

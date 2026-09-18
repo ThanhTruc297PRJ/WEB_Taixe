@@ -15,6 +15,7 @@ import dayjs from 'dayjs'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { listIncidents } from '../services/incidents'
+import { getSettings } from '../services/settings'
 import { useDrivers } from '../contexts/useDrivers'
 import { toDate } from '../utils/firestore'
 import PageHeader from '../components/PageHeader'
@@ -26,23 +27,25 @@ const TYPE_META = {
 
 const typeLabel = (t) => TYPE_META[t]?.label ?? t
 
-const MILESTONES = [
-  { at: 10, label: 'Nhắc nhở', color: '#faad14' },
-  { at: 22, label: 'Cảnh cáo', color: '#fa8c16' },
-  { at: 30, label: 'Đình chỉ', color: '#f5222d' },
-]
+// Mặc định dùng tạm trong lúc chờ tải cấu hình thật từ trang Cài đặt.
+const DEFAULT_THRESHOLDS = { reminder: 10, warning: 22, suspend: 30 }
 
-function currentLevel(points) {
-  if (points >= 30) return { label: 'Đình chỉ', color: 'red' }
-  if (points >= 22) return { label: 'Cảnh cáo', color: 'orange' }
-  if (points >= 10) return { label: 'Nhắc nhở', color: 'gold' }
+function currentLevel(points, thresholds) {
+  if (points >= thresholds.suspend) return { label: 'Đình chỉ', color: 'red' }
+  if (points >= thresholds.warning) return { label: 'Cảnh cáo', color: 'orange' }
+  if (points >= thresholds.reminder) return { label: 'Nhắc nhở', color: 'gold' }
   return { label: 'Bình thường', color: 'green' }
 }
 
-function MilestoneBar({ points }) {
-  const scale = points > 30 ? points + 5 : 35
+function MilestoneBar({ points, thresholds }) {
+  const milestones = [
+    { at: thresholds.reminder, label: 'Nhắc nhở', color: '#faad14' },
+    { at: thresholds.warning, label: 'Cảnh cáo', color: '#fa8c16' },
+    { at: thresholds.suspend, label: 'Đình chỉ', color: '#f5222d' },
+  ]
+  const scale = points > thresholds.suspend ? points + 5 : 35
   const pct = (v) => `${(v / scale) * 100}%`
-  const level = currentLevel(points)
+  const level = currentLevel(points, thresholds)
 
   return (
     <div className="mb-8">
@@ -56,7 +59,7 @@ function MilestoneBar({ points }) {
           className="absolute h-2.5 rounded-full bg-blue-400"
           style={{ width: pct(Math.min(points, scale)) }}
         />
-        {MILESTONES.map((m) => (
+        {milestones.map((m) => (
           <div
             key={m.at}
             className="absolute -top-2"
@@ -120,6 +123,15 @@ function Incidents() {
   const [driverFilter, setDriverFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [selected, setSelected] = useState(null)
+  const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS)
+
+  useEffect(() => {
+    getSettings()
+      .then((s) => setThresholds(s.violation_thresholds))
+      .catch(() => {
+        /* giữ mặc định nếu tải cấu hình lỗi — không chặn trang sự cố */
+      })
+  }, [])
 
   const applyRows = useCallback((list) => {
     list.sort((a, b) => _ts(b.detected_at) - _ts(a.detected_at))
@@ -221,7 +233,7 @@ function Incidents() {
         }
       />
 
-      <MilestoneBar points={totalPoints} />
+      <MilestoneBar points={totalPoints} thresholds={thresholds} />
 
       <Space className="mb-4" wrap>
         <Select

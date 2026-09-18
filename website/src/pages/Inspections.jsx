@@ -18,6 +18,7 @@ import { BellOutlined, CheckCircleOutlined, PlusOutlined } from '@ant-design/ico
 import dayjs from 'dayjs'
 import { listVehicles } from '../services/vehicles'
 import { listDrivers } from '../services/drivers'
+import { getSettings } from '../services/settings'
 import {
   completeInspection,
   createInspection,
@@ -57,8 +58,17 @@ function Inspections() {
   const [notifyingId, setNotifyingId] = useState(null)
   const [completeTarget, setCompleteTarget] = useState(null)
   const [completing, setCompleting] = useState(false)
+  const [reminderDefaultDays, setReminderDefaultDays] = useState(15)
   const [form] = Form.useForm()
   const [completeForm] = Form.useForm()
+
+  useEffect(() => {
+    getSettings()
+      .then((s) => setReminderDefaultDays(s.inspection_defaults.remind_days_before))
+      .catch(() => {
+        /* giữ mặc định cứng nếu tải cấu hình lỗi */
+      })
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -109,7 +119,7 @@ function Inspections() {
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ remind_days_before: 15 })
+    form.setFieldsValue({ remind_days_before: reminderDefaultDays })
     setModalOpen(true)
   }
 

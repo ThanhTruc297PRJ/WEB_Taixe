@@ -36,13 +36,14 @@ function UserProfile() {
     >
       <div className="flex cursor-pointer select-none items-center gap-2.5 rounded-lg px-2 py-1 transition-colors hover:bg-slate-100">
         <Avatar
-          icon={<UserOutlined />}
-          style={{ backgroundColor: '#2563EB' }}
+          src={user?.photoURL || undefined}
+          icon={user?.photoURL ? undefined : <UserOutlined />}
+          style={user?.photoURL ? undefined : { backgroundColor: '#2563EB' }}
           size="small"
         />
         <div className="hidden leading-tight sm:block">
           <div className="text-sm font-medium text-slate-800">
-            {user?.email ?? 'Admin'}
+            {user?.displayName || user?.email || 'Admin'}
           </div>
           <div className="text-[11px] text-slate-400">Quản trị viên</div>
         </div>

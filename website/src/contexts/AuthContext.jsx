@@ -19,6 +19,10 @@ export function AuthProvider({ children }) {
   // "đã đăng nhập" chưa đủ — phải là admin mới được vào web quản trị.
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
+  // Chỉ dùng để ép re-render sau refreshUser() — updateProfile() sửa thẳng
+  // auth.currentUser mà không tự bắn lại onAuthStateChanged, nên setUser()
+  // với cùng reference sẽ bị React bỏ qua nếu không có state đổi kèm theo.
+  const [, bump] = useState(0)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -41,9 +45,25 @@ export function AuthProvider({ children }) {
 
   const logout = () => signOut(auth)
 
+  // Gọi sau khi updateProfile() (đổi tên hiển thị / ảnh đại diện ở trang Cài
+  // đặt) — buộc mọi nơi đang đọc `user` từ context (avatar Header, trang Cài
+  // đặt...) vẽ lại với dữ liệu mới ngay, không cần tải lại trang.
+  const refreshUser = async () => {
+    await auth.currentUser?.reload()
+    bump((t) => t + 1)
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, isAdmin, loading, login, loginWithGoogle, logout }}
+      value={{
+        user: auth.currentUser ?? user,
+        isAdmin,
+        loading,
+        login,
+        loginWithGoogle,
+        logout,
+        refreshUser,
+      }}
     >
       {children}
     </AuthContext.Provider>
