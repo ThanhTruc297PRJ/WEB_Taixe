@@ -1,7 +1,11 @@
+import os
+import tempfile
 import urllib.parse
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+import cv2
 
 from app.core.firebase import bucket, db
 from app.models.incident import IncidentCreate
@@ -102,6 +106,66 @@ def _upload_clip(uid: str, data: bytes, content_type: Optional[str]) -> str:
     )
 
 
+def _generate_thumbnail(clip_bytes: bytes, content_type: Optional[str]) -> Optional[bytes]:
+    """Trích 1 khung hình từ clip sự cố làm ảnh xem nhanh (best-effort — lỗi
+    gì cũng bỏ qua, không được làm hỏng luồng tạo sự cố)."""
+    ext = "mp4" if content_type and "mp4" in content_type else "bin"
+    tmp_path = None
+    cap = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
+            tmp.write(clip_bytes)
+            tmp_path = tmp.name
+
+        cap = cv2.VideoCapture(tmp_path)
+        if not cap.isOpened():
+            return None
+
+        fps = cap.get(cv2.CAP_PROP_FPS) or 0
+        frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+        # Lấy khung ở giây thứ ~1 (bỏ qua khung mở đầu hay bị mờ/tối), clip
+        # ngắn hơn thì lấy khung đầu.
+        if fps > 1 and frame_count > fps:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(fps))
+        ok, frame = cap.read()
+        if not ok or frame is None:
+            return None
+
+        height, width = frame.shape[:2]
+        if width > 320:
+            scale = 320 / width
+            frame = cv2.resize(frame, (320, int(height * scale)))
+
+        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if not ok:
+            return None
+        return buf.tobytes()
+    except Exception:
+        return None
+    finally:
+        if cap is not None:
+            cap.release()
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+def _upload_snapshot(uid: str, thumbnail_bytes: bytes) -> str:
+    """Đưa ảnh xem nhanh lên Firebase Storage kèm download token, trả URL tải
+    qua CDN (giống hệt cách _upload_clip làm với video)."""
+    if bucket is None:
+        raise RuntimeError("Chưa cấu hình FIREBASE_STORAGE_BUCKET")
+    name = f"incident_snapshots/{uid}/{uuid.uuid4().hex}.jpg"
+    token = str(uuid.uuid4())
+    blob = bucket.blob(name)
+    blob.metadata = {"firebaseStorageDownloadTokens": token}
+    blob.upload_from_string(thumbnail_bytes, content_type="image/jpeg")
+    encoded = urllib.parse.quote(name, safe="")
+    return (
+        f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}"
+        f"/o/{encoded}?alt=media&token={token}"
+    )
+
+
 def report_from_driver(
     uid: str,
     incident_type: str,
@@ -113,6 +177,17 @@ def report_from_driver(
     """App tài xế: model phát hiện buồn ngủ -> quay 10s -> gửi lên đây.
     driver_id lấy từ token, không tin client."""
     clip_url = _upload_clip(uid, clip_bytes, content_type)
+
+    snapshot_url = None
+    thumbnail_bytes = _generate_thumbnail(clip_bytes, content_type)
+    if thumbnail_bytes:
+        try:
+            snapshot_url = _upload_snapshot(uid, thumbnail_bytes)
+        except Exception:
+            # Ảnh xem nhanh chỉ là tiện ích thêm; lỗi upload không được làm
+            # fail việc tạo sự cố (clip gốc đã lưu thành công ở trên).
+            snapshot_url = None
+
     try:
         dt = datetime.fromisoformat(detected_at.replace("Z", "+00:00"))
     except ValueError:
@@ -124,6 +199,7 @@ def report_from_driver(
             detected_at=dt,
             confidence=confidence,
             clip_url=clip_url,
+            snapshot_url=snapshot_url,
         )
     )
 
