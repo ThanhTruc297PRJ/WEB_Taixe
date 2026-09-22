@@ -11,7 +11,9 @@ from app.services import (
     inspection_service,
     maintenance_service,
     music_service,
+    vehicle_service,
 )
+from app.services.maintenance_service import _TYPE_LABELS as _MAINTENANCE_TYPE_LABELS
 
 _ITEM_LIMIT = 5
 _INCIDENT_WINDOW_HOURS = 24
@@ -41,30 +43,40 @@ def _pending_drivers() -> dict:
 
 def _maintenance_due() -> dict:
     due = maintenance_service.list_upcoming()
-    items = [
-        {
-            "id": m["id"],
-            "vehicle_id": m.get("vehicle_id"),
-            "type": m.get("type"),
-            "scheduled_date": m.get("scheduled_date"),
-            "due_odometer_km": m.get("due_odometer_km"),
-        }
-        for m in due[:_ITEM_LIMIT]
-    ]
+    items = []
+    for m in due[:_ITEM_LIMIT]:
+        vehicle = vehicle_service.get_vehicle(m.get("vehicle_id"))
+        items.append(
+            {
+                "id": m["id"],
+                "vehicle_id": m.get("vehicle_id"),
+                # Biển số + nhãn loại bảo trì đã dịch — web chỉ hiển thị thẳng,
+                # không tự tra cứu/dịch lại (tránh hiện raw id/enum kiểu
+                # "oil_change" hay chuỗi document id dài ngoằng ngoài UI).
+                "plate_number": (vehicle or {}).get("plate_number"),
+                "type": m.get("type"),
+                "type_label": _MAINTENANCE_TYPE_LABELS.get(m.get("type"), m.get("type")),
+                "scheduled_date": m.get("scheduled_date"),
+                "due_odometer_km": m.get("due_odometer_km"),
+            }
+        )
     return {"count": len(due), "items": items}
 
 
 def _inspections_due() -> dict:
     due = inspection_service.list_upcoming()
-    items = [
-        {
-            "id": i["id"],
-            "vehicle_id": i.get("vehicle_id"),
-            "station": i.get("station"),
-            "old_sticker_expiry": i.get("old_sticker_expiry"),
-        }
-        for i in due[:_ITEM_LIMIT]
-    ]
+    items = []
+    for i in due[:_ITEM_LIMIT]:
+        vehicle = vehicle_service.get_vehicle(i.get("vehicle_id"))
+        items.append(
+            {
+                "id": i["id"],
+                "vehicle_id": i.get("vehicle_id"),
+                "plate_number": (vehicle or {}).get("plate_number"),
+                "station": i.get("station"),
+                "old_sticker_expiry": i.get("old_sticker_expiry"),
+            }
+        )
     return {"count": len(due), "items": items}
 
 

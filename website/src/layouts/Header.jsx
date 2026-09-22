@@ -124,7 +124,13 @@ function NotificationPanel({ data, error, onNavigate }) {
                     style={styles.itemBtn}
                   >
                     <div style={styles.itemTitle}>
-                      {item.name || item.title || item.type || item.vehicle_id || item.id}
+                      {item.name ||
+                        item.title ||
+                        item.plate_number ||
+                        item.type_label ||
+                        item.type ||
+                        item.vehicle_id ||
+                        item.id}
                     </div>
                     {desc && <div style={styles.itemDesc}>{desc}</div>}
                   </button>

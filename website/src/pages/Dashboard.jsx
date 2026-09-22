@@ -135,7 +135,13 @@ function AttentionSection({ data, navigate }) {
                   <div className="flex flex-col gap-1">
                     {section.items.slice(0, 3).map((item) => {
                       const title =
-                        item.name || item.title || item.type || item.vehicle_id || item.id
+                        item.name ||
+                        item.title ||
+                        item.plate_number ||
+                        item.type_label ||
+                        item.type ||
+                        item.vehicle_id ||
+                        item.id
                       const desc = s.describe(item)
                       return (
                         <div key={item.id} className="truncate text-xs text-slate-500">

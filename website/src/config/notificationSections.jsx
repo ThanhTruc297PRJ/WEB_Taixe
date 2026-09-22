@@ -24,10 +24,12 @@ export const NOTIFICATION_SECTIONS = [
     label: 'Bảo trì sắp tới hạn',
     path: '/maintenance',
     icon: <ToolOutlined />,
-    describe: (item) =>
-      item.scheduled_date
+    describe: (item) => {
+      const when = item.scheduled_date
         ? `Hẹn ${dayjs(item.scheduled_date).format('DD/MM/YYYY')}`
-        : 'Sắp tới hạn theo km',
+        : 'Sắp tới hạn theo km'
+      return item.type_label ? `${item.type_label} · ${when}` : when
+    },
   },
   {
     key: 'inspections_due',
