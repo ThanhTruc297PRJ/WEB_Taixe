@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Card, Col, Row, Button, Empty, Badge } from 'antd'
+import { Card, Col, Row, Button, Empty, Badge, Popover } from 'antd'
 import {
   TeamOutlined,
   CarOutlined,
@@ -30,8 +30,42 @@ const WEEKS = 8
 const PRESENCE_STALE_MS = 120_000
 const SPEED_STALE_MS = 30_000
 
-function HeroStatCard({ icon, label, value, trend, tone = 'blue', onClick }) {
+// Nội dung Popover render trong portal riêng của AntD — class Tailwind bị đè
+// bởi CSS-in-JS của AntD ở đó, nên toàn bộ style ở đây dùng inline style.
+function HeroStatPopover({ items, emptyText }) {
+  if (!items || items.length === 0) {
+    return (
+      <div style={{ fontSize: 12, color: '#94a3b8', padding: '2px 4px', maxWidth: 220 }}>
+        {emptyText}
+      </div>
+    )
+  }
   return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 200, maxWidth: 260 }}>
+      {items.map((item) => (
+        <div
+          key={item.key}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 12,
+            fontSize: 12.5,
+          }}
+        >
+          <span style={{ color: '#334155', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {item.primary}
+          </span>
+          {item.secondary && (
+            <span style={{ color: '#94a3b8', flex: 'none' }}>{item.secondary}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function HeroStatCard({ icon, label, value, trend, tone = 'blue', onClick, items, emptyText }) {
+  const card = (
     <Card
       hoverable={!!onClick}
       onClick={onClick}
@@ -56,6 +90,19 @@ function HeroStatCard({ icon, label, value, trend, tone = 'blue', onClick }) {
         </div>
       )}
     </Card>
+  )
+
+  if (!items) return card
+
+  return (
+    <Popover
+      trigger="hover"
+      placement="bottom"
+      title={<span style={{ fontSize: 12.5, fontWeight: 600 }}>{label}</span>}
+      content={<HeroStatPopover items={items} emptyText={emptyText} />}
+    >
+      {card}
+    </Popover>
   )
 }
 
@@ -220,29 +267,62 @@ function Dashboard() {
       const seen = toDate(d.last_seen)
       return !!seen && nowMs - seen.getTime() <= PRESENCE_STALE_MS
     }
-    const online = drivers.filter(
+    const onlineDrivers = drivers.filter(
       (d) => (d.presence === 'online' || d.presence === 'driving') && isFresh(d),
-    ).length
+    )
     const driving = drivers.filter((d) => d.presence === 'driving' && isFresh(d))
-    const freshSpeeds = driving
-      .map((d) => {
-        const updatedAt = toDate(d.speed_updated_at)
-        if (d.current_speed_kmh == null || !updatedAt) return null
-        if (nowMs - updatedAt.getTime() > SPEED_STALE_MS) return null
-        return d.current_speed_kmh
-      })
-      .filter((v) => v != null)
+    const freshSpeed = (d) => {
+      const updatedAt = toDate(d.speed_updated_at)
+      if (d.current_speed_kmh == null || !updatedAt) return null
+      if (nowMs - updatedAt.getTime() > SPEED_STALE_MS) return null
+      return d.current_speed_kmh
+    }
+    const freshSpeeds = driving.map(freshSpeed).filter((v) => v != null)
     const avgSpeed = freshSpeeds.length
       ? Math.round(freshSpeeds.reduce((s, v) => s + v, 0) / freshSpeeds.length)
       : null
     const pending = drivers.filter((d) => (d.status ?? 'active') === 'pending').length
+    const onlineList = onlineDrivers.map((d) => ({
+      key: d.id,
+      primary: d.name || d.id,
+      secondary: d.presence === 'driving' ? 'Đang lái' : 'Trực tuyến',
+    }))
     return {
       total: drivers.length,
-      online,
+      online: onlineDrivers.length,
+      onlineList,
+      driving,
       drivingCount: driving.length,
+      freshSpeed,
       avgSpeed,
       pending,
     }
+  }, [drivers])
+
+  const vehicleById = useMemo(() => {
+    const map = {}
+    for (const v of vehicles) map[v.id] = v
+    return map
+  }, [vehicles])
+
+  const drivingVehicleItems = useMemo(
+    () =>
+      driverStats.driving.map((d) => {
+        const vehicle = vehicles.find((v) => v.driver_id === d.id)
+        const speed = driverStats.freshSpeed(d)
+        return {
+          key: d.id,
+          primary: vehicle ? vehicle.plate_number : `${d.name || d.id} (chưa gán xe)`,
+          secondary: speed != null ? `${Math.round(speed)} km/h` : null,
+        }
+      }),
+    [driverStats, vehicles],
+  )
+
+  const driverName = useMemo(() => {
+    const map = {}
+    for (const d of drivers) map[d.id] = d.name
+    return map
   }, [drivers])
 
   const todayIncidentStats = useMemo(() => {
@@ -251,7 +331,7 @@ function Dashboard() {
       const d = toDate(i.detected_at)
       return d && dayjs(d).isAfter(today)
     })
-    const drowsy = todays.filter((i) => i.type === 'drowsiness').length
+    const drowsyToday = todays.filter((i) => i.type === 'drowsiness')
     const hourCounts = Array(24).fill(0)
     for (const i of todays) {
       const d = toDate(i.detected_at)
@@ -261,24 +341,37 @@ function Dashboard() {
       (best, c, h) => (c > best.c ? { h, c } : best),
       { h: 0, c: 0 },
     )
+    const drowsyList = drowsyToday
+      .sort((a, b) => toDate(b.detected_at) - toDate(a.detected_at))
+      .map((i) => ({
+        key: i.id,
+        primary: driverName[i.driver_id] || i.driver_id || 'Không rõ tài xế',
+        secondary: toDate(i.detected_at) ? dayjs(toDate(i.detected_at)).format('HH:mm') : '',
+      }))
     return {
       total: todays.length,
-      drowsy,
+      drowsy: drowsyToday.length,
+      drowsyList,
       peakText: peakHour.c > 0 ? `Cao điểm lúc ${peakHour.h}h` : 'Chưa có sự cố hôm nay',
     }
-  }, [incidents])
+  }, [incidents, driverName])
 
   const maintenanceStats = useMemo(() => {
     const items = [...attention.maintenance_due.items, ...attention.inspections_due.items]
-    const dates = items
-      .map((i) => toDate(i.scheduled_date) || toDate(i.old_sticker_expiry))
-      .filter(Boolean)
-      .sort((a, b) => a - b)
+    const withDate = items
+      .map((i) => ({ item: i, date: toDate(i.scheduled_date) || toDate(i.old_sticker_expiry) }))
+      .sort((a, b) => (a.date && b.date ? a.date - b.date : 0))
+    const list = withDate.map(({ item, date }) => ({
+      key: item.id,
+      primary: vehicleById[item.vehicle_id]?.plate_number || item.vehicle_id,
+      secondary: date ? dayjs(date).format('DD/MM/YYYY') : '',
+    }))
     return {
       count: attention.maintenance_due.count + attention.inspections_due.count,
-      nearest: dates[0] ? dayjs(dates[0]).format('DD/MM/YYYY') : null,
+      nearest: withDate[0]?.date ? dayjs(withDate[0].date).format('DD/MM/YYYY') : null,
+      list,
     }
-  }, [attention])
+  }, [attention, vehicleById])
 
   const weeklyIncidents = useMemo(() => {
     const now = dayjs()
@@ -334,6 +427,8 @@ function Dashboard() {
             }
             tone="blue"
             onClick={() => navigate('/drivers')}
+            items={driverStats.onlineList}
+            emptyText="Chưa có tài xế nào trực tuyến"
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
@@ -348,6 +443,8 @@ function Dashboard() {
             }
             tone="green"
             onClick={() => navigate('/vehicles')}
+            items={drivingVehicleItems}
+            emptyText="Chưa có xe nào đang lưu thông"
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
@@ -358,6 +455,8 @@ function Dashboard() {
             trend={todayIncidentStats.peakText}
             tone="rose"
             onClick={() => navigate('/incidents')}
+            items={todayIncidentStats.drowsyList}
+            emptyText="Chưa có cảnh báo buồn ngủ nào hôm nay"
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
@@ -368,6 +467,8 @@ function Dashboard() {
             trend={maintenanceStats.nearest ? `Hạn gần nhất: ${maintenanceStats.nearest}` : null}
             tone="amber"
             onClick={() => navigate('/maintenance')}
+            items={maintenanceStats.list}
+            emptyText="Chưa có xe nào sắp tới hạn"
           />
         </Col>
       </Row>
