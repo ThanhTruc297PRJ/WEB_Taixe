@@ -5,7 +5,9 @@ import {
   Avatar,
   Card,
   Col,
+  Empty,
   Input,
+  List,
   Modal,
   Row,
   Segmented,
@@ -22,9 +24,11 @@ import {
   PlayCircleFilled,
   PauseCircleFilled,
 } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import PageHeader from '../components/PageHeader'
 import { useMusicRealtime } from '../hooks/useMusicRealtime'
-import { listTracks, toggleTrack } from '../services/music'
+import { useDrivers } from '../contexts/useDrivers'
+import { getTrackReports, listTracks, toggleTrack } from '../services/music'
 
 const TONES = {
   blue: 'bg-blue-50 text-blue-600',
@@ -53,6 +57,7 @@ function Stat({ icon, label, value, tone }) {
 
 function Music() {
   const { message } = App.useApp()
+  const { drivers } = useDrivers()
   const { tracks: live, loading, error } = useMusicRealtime()
   const [fallback, setFallback] = useState(null)
   const [search, setSearch] = useState('')
@@ -61,6 +66,28 @@ function Music() {
   const [reason, setReason] = useState('')
   const [playingId, setPlayingId] = useState(null)
   const audioRef = useRef(null)
+  const [reportTarget, setReportTarget] = useState(null)
+  const [reportDetails, setReportDetails] = useState([])
+  const [reportLoading, setReportLoading] = useState(false)
+
+  const driverName = useMemo(() => {
+    const map = {}
+    for (const d of drivers) map[d.id] = d.name
+    return map
+  }, [drivers])
+
+  const openReportDetails = async (track) => {
+    setReportTarget(track)
+    setReportLoading(true)
+    try {
+      setReportDetails(await getTrackReports(track.id))
+    } catch (e) {
+      message.error(e.message)
+      setReportDetails([])
+    } finally {
+      setReportLoading(false)
+    }
+  }
 
   useEffect(() => {
     const audio = new Audio()
@@ -210,8 +237,14 @@ function Music() {
       align: 'center',
       render: (v, t) =>
         t.reported ? (
-          <Tooltip title={t.last_report_reason || 'Không có lý do'}>
-            <Tag color="red" bordered={false} icon={<FlagOutlined />}>
+          <Tooltip title="Bấm để xem tài xế nào đã báo cáo">
+            <Tag
+              color="red"
+              bordered={false}
+              icon={<FlagOutlined />}
+              onClick={() => openReportDetails(t)}
+              className="cursor-pointer"
+            >
               {v ?? 1}
             </Tag>
           </Tooltip>
@@ -346,6 +379,53 @@ function Music() {
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Ví dụ: Lời bài hát không phù hợp"
+        />
+      </Modal>
+
+      <Modal
+        open={!!reportTarget}
+        title={`Tài xế đã báo cáo: ${reportTarget?.title ?? ''}`}
+        onCancel={() => setReportTarget(null)}
+        footer={null}
+        destroyOnHidden
+      >
+        {!reportLoading && reportDetails.length === 0 && (reportTarget?.report_count ?? 0) > 0 && (
+          <Alert
+            className="mb-3"
+            type="warning"
+            showIcon
+            message={`${reportTarget.report_count} lượt báo cáo không rõ tài xế`}
+            description={
+              <>
+                Đây là báo cáo cũ từ trước khi hệ thống lưu chi tiết từng lượt (ai báo, lúc
+                nào) — chỉ còn lại lý do gần nhất:{' '}
+                <strong>{reportTarget.last_report_reason || 'Không có lý do'}</strong>. Các
+                lượt báo cáo mới từ giờ sẽ hiện đầy đủ bên dưới.
+              </>
+            }
+          />
+        )}
+        <List
+          loading={reportLoading}
+          dataSource={reportDetails}
+          locale={{ emptyText: <Empty description="Chưa có lượt báo cáo mới nào" /> }}
+          renderItem={(r) => (
+            <List.Item>
+              <div className="flex w-full items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-slate-700">
+                    {driverName[r.driver_id] || r.driver_id || 'Không rõ tài xế'}
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {r.reason || 'Không có lý do'}
+                  </div>
+                </div>
+                <div className="shrink-0 text-xs text-slate-400">
+                  {r.reported_at ? dayjs(r.reported_at).format('HH:mm DD/MM/YYYY') : ''}
+                </div>
+              </div>
+            </List.Item>
+          )}
         />
       </Modal>
     </div>
