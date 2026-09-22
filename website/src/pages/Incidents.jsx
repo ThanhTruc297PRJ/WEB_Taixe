@@ -52,7 +52,7 @@ function MilestoneBar({ points, thresholds }) {
   const level = currentLevel(points, thresholds)
 
   return (
-    <div className="mb-8">
+    <div className="mb-12">
       <div className="flex items-baseline gap-3 mb-1">
         <span className="text-sm text-gray-500">Tổng điểm vi phạm</span>
         <span className="text-2xl font-semibold text-gray-800">{points}</span>
@@ -63,18 +63,25 @@ function MilestoneBar({ points, thresholds }) {
           className="absolute h-2.5 rounded-full bg-blue-400"
           style={{ width: pct(Math.min(points, scale)) }}
         />
-        {milestones.map((m) => (
-          <div
-            key={m.at}
-            className="absolute -top-2"
-            style={{ left: pct(m.at) }}
-          >
-            <div className="h-6 w-0.5" style={{ background: m.color }} />
-            <div className="absolute mt-1 -translate-x-1/2 whitespace-nowrap text-xs text-gray-500">
-              {m.at} · {m.label}
+        {milestones.map((m, i) => {
+          // So le hàng trên/dưới cho nhãn liền kề — 2 mốc gần nhau (vd 22 và
+          // 30) dễ bị chữ đè lên nhau nếu cùng 1 hàng.
+          const staggered = i % 2 === 1
+          return (
+            <div key={m.at} className="absolute -top-2" style={{ left: pct(m.at) }}>
+              <div
+                className="w-0.5"
+                style={{ background: m.color, height: staggered ? '2.25rem' : '1.5rem' }}
+              />
+              <div
+                className="absolute -translate-x-1/2 whitespace-nowrap text-xs text-gray-500"
+                style={{ top: staggered ? '2.5rem' : '1.75rem' }}
+              >
+                {m.at} · {m.label}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
