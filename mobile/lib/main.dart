@@ -26,9 +26,7 @@ import 'presentation/screens/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   runApp(
     MultiProvider(
@@ -74,9 +72,7 @@ class _Gate extends StatelessWidget {
     final gate = context.watch<AuthViewModel>().gate;
     switch (gate) {
       case GateState.loading:
-        return const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        );
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
       case GateState.login:
         return const LoginScreen();
       case GateState.register:

@@ -69,7 +69,16 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
     return WithForegroundTask(
       child: Scaffold(
-        appBar: AppBar(title: const Text('Giám sát an toàn lái xe')),
+        appBar: AppBar(
+          title: const Text('Giám sát an toàn lái xe'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.switch_camera),
+              tooltip: 'Đổi nguồn Camera',
+              onPressed: vm.isMonitoring ? () => vm.switchCamera() : null,
+            ),
+          ],
+        ),
         body: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -125,7 +134,6 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Trong lúc quay clip sự cố (10s) camera không nhận diện — báo cho tài xế biết.
     if (vm.capturingIncident) {
       return Card(
         color: Colors.orange.withValues(alpha: 0.15),
@@ -142,17 +150,13 @@ class _StatusCard extends StatelessWidget {
                 ),
               ),
               SizedBox(width: 12),
-              Expanded(
-                child: Text('Đang ghi lại video sự cố (10 giây)...'),
-              ),
+              Expanded(child: Text('Đang ghi lại video sự cố (10 giây)...')),
             ],
           ),
         ),
       );
     }
 
-    // Model MLP-Feature bỏ giai đoạn hiệu chỉnh baseline -> chỉ còn idle /
-    // monitoring (xem MonitoringViewModel).
     final (icon, color, label) = switch (vm.phase) {
       MonitoringPhase.idle => (
         Icons.hourglass_empty,
