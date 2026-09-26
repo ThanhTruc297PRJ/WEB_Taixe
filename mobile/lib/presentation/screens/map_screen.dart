@@ -123,13 +123,11 @@ class _MapScreenState extends State<MapScreen> {
         double.parse(parts[1].trim()),
       );
     }
-
     final query =
         trimmed.toLowerCase().contains('vietnam') ||
             trimmed.toLowerCase().contains('việt nam')
         ? trimmed
         : '$trimmed, Vietnam';
-
     try {
       final url = Uri.parse(
         'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=1&countrycodes=vn',
@@ -159,7 +157,6 @@ class _MapScreenState extends State<MapScreen> {
         _endController.text.trim().isEmpty) {
       return;
     }
-
     setState(() {
       _isLoadingRoute = true;
       _polylines.clear();
@@ -169,7 +166,6 @@ class _MapScreenState extends State<MapScreen> {
     try {
       LatLng? startLatLng;
       final startText = _startController.text.trim().toLowerCase();
-
       if ((startText == 'vị trí hiện tại' ||
               startText == 'my location' ||
               startText.isEmpty) &&
@@ -188,7 +184,6 @@ class _MapScreenState extends State<MapScreen> {
         );
         return;
       }
-
       if (endLatLng == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -198,11 +193,8 @@ class _MapScreenState extends State<MapScreen> {
       }
 
       final url = Uri.parse(
-        'https://router.project-osrm.org/route/v1/driving/'
-        '${startLatLng.longitude},${startLatLng.latitude};${endLatLng.longitude},${endLatLng.latitude}'
-        '?geometries=geojson&overview=full',
+        'https://router.project-osrm.org/route/v1/driving/${startLatLng.longitude},${startLatLng.latitude};${endLatLng.longitude},${endLatLng.latitude}?geometries=geojson&overview=full',
       );
-
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -224,7 +216,7 @@ class _MapScreenState extends State<MapScreen> {
             Polyline(
               polylineId: const PolylineId('route'),
               points: routePoints,
-              color: const Color(0xFF00E5FF),
+              color: const Color(0xFF2A8B88),
               width: 5,
             ),
           );
@@ -241,7 +233,7 @@ class _MapScreenState extends State<MapScreen> {
               position: endLatLng,
               infoWindow: const InfoWindow(title: 'Điểm đến'),
               icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueGreen,
+                BitmapDescriptor.hueCyan,
               ),
             ),
           );
@@ -259,9 +251,7 @@ class _MapScreenState extends State<MapScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
     } finally {
-      if (mounted) {
-        setState(() => _isLoadingRoute = false);
-      }
+      if (mounted) setState(() => _isLoadingRoute = false);
     }
   }
 
@@ -295,9 +285,10 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: _initialPosition == null
           ? const Center(
-              child: CircularProgressIndicator(color: Colors.cyanAccent),
+              child: CircularProgressIndicator(color: Color(0xFF2A8B88)),
             )
           : Stack(
               children: [
@@ -313,7 +304,7 @@ class _MapScreenState extends State<MapScreen> {
                   zoomControlsEnabled: false,
                   polylines: _polylines,
                   markers: _markers,
-                  padding: const EdgeInsets.only(top: 170),
+                  padding: const EdgeInsets.only(top: 220),
                   onMapCreated: (GoogleMapController controller) {
                     if (!_controller.isCompleted) {
                       _controller.complete(controller);
@@ -321,104 +312,134 @@ class _MapScreenState extends State<MapScreen> {
                   },
                 ),
                 Positioned(
-                  top: MediaQuery.of(context).padding.top + 8,
+                  top: MediaQuery.of(context).padding.top + 56,
                   left: 16,
                   right: 16,
-                  child: Card(
-                    color: const Color(0xFF131927),
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: Color(0xFF1E293B)),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           TextField(
                             controller: _startController,
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
                             decoration: InputDecoration(
                               hintText: 'Điểm đi (hoặc "Vị trí hiện tại")',
-                              hintStyle: const TextStyle(color: Colors.white54),
+                              hintStyle: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontWeight: FontWeight.normal,
+                              ),
                               prefixIcon: const Icon(
                                 Icons.my_location,
-                                color: Color(0xFF00E5FF),
+                                color: Color(0xFF2A8B88),
                               ),
                               suffixIcon: IconButton(
                                 icon: const Icon(
                                   Icons.gps_fixed,
-                                  color: Color(0xFF00E5FF),
+                                  color: Color(0xFF2A8B88),
                                   size: 20,
                                 ),
-                                onPressed: () {
-                                  _startController.text = 'Vị trí hiện tại';
-                                },
+                                onPressed: () =>
+                                    _startController.text = 'Vị trí hiện tại',
                               ),
                               filled: true,
-                              fillColor: const Color(0xFF1E2638),
+                              fillColor: const Color(0xFFF3F4F6),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(16),
                                 borderSide: BorderSide.none,
                               ),
                               contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
+                                horizontal: 16,
+                                vertical: 14,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                           TextField(
                             controller: _endController,
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
                             decoration: InputDecoration(
-                              hintText: 'Nhập điểm đến (VD: Buôn Ma Thuột)',
-                              hintStyle: const TextStyle(color: Colors.white54),
+                              hintText: 'Nhập điểm đến (VD: Tân Bình)',
+                              hintStyle: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontWeight: FontWeight.normal,
+                              ),
                               prefixIcon: const Icon(
                                 Icons.location_on,
-                                color: Color(0xFFFF5252),
+                                color: Colors.redAccent,
                               ),
                               filled: true,
-                              fillColor: const Color(0xFF1E2638),
+                              fillColor: const Color(0xFFF3F4F6),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(16),
                                 borderSide: BorderSide.none,
                               ),
                               contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
+                                horizontal: 16,
+                                vertical: 14,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 44,
-                            child: ElevatedButton(
-                              onPressed: _isLoadingRoute ? null : _fetchRoute,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF00E5FF),
-                                foregroundColor: Colors.black,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                          const SizedBox(height: 16),
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF2A8B88), Color(0xFF175452)],
                               ),
-                              child: _isLoadingRoute
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.black,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: _isLoadingRoute ? null : _fetchRoute,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                child: _isLoadingRoute
+                                    ? const SizedBox(
+                                        height: 24,
+                                        width: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'TÌM ĐƯỜNG',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.2,
+                                        ),
                                       ),
-                                    )
-                                  : const Text(
-                                      'Tìm đường',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                              ),
                             ),
                           ),
                         ],

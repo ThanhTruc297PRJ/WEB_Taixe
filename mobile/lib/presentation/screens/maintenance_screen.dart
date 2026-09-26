@@ -24,7 +24,7 @@ class MaintenanceScreen extends StatelessWidget {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFFD32F2F),
+              primary: Color(0xFF2A8B88),
               onPrimary: Colors.white,
               onSurface: Colors.black,
             ),
@@ -49,53 +49,59 @@ class MaintenanceScreen extends StatelessWidget {
     final dateFormat = DateFormat('dd/MM/yyyy');
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFFFF0F0), Colors.white],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            FadeInDown(
+      backgroundColor: Colors.transparent,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 105, 16, 120),
+        children: [
+          FadeInDown(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A8B88).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color(0xFF2A8B88).withValues(alpha: 0.2),
+                ),
+              ),
               child: const Text(
                 'Theo dõi tình trạng phương tiện để đảm bảo an toàn tuyệt đối trên mọi hành trình.',
-                style: TextStyle(color: Colors.black54, fontSize: 14),
+                style: TextStyle(
+                  color: Color(0xFF2A8B88),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-            const SizedBox(height: 30),
+          ),
+          const SizedBox(height: 20),
 
-            FadeInLeft(
-              delay: const Duration(milliseconds: 100),
-              child: _buildMaintenanceCard(
-                context: context,
-                title: 'Hạn Đăng Kiểm',
-                icon: FluentIcons.document_text_24_filled,
-                date: vm.inspectionDate,
-                daysLeft: vm.daysUntilInspection,
-                dateFormat: dateFormat,
-                onTap: () => _selectDate(context, true),
-              ),
+          FadeInLeft(
+            delay: const Duration(milliseconds: 100),
+            child: _buildMaintenanceCard(
+              context: context,
+              title: 'Hạn Đăng Kiểm',
+              icon: FluentIcons.document_text_24_filled,
+              date: vm.inspectionDate,
+              daysLeft: vm.daysUntilInspection,
+              dateFormat: dateFormat,
+              onTap: () => _selectDate(context, true),
             ),
-            const SizedBox(height: 20),
+          ),
+          const SizedBox(height: 16),
 
-            FadeInRight(
-              delay: const Duration(milliseconds: 200),
-              child: _buildMaintenanceCard(
-                context: context,
-                title: 'Lịch Thay Nhớt Máy',
-                icon: FluentIcons.drop_24_filled,
-                date: vm.oilChangeDate,
-                daysLeft: vm.daysUntilOilChange,
-                dateFormat: dateFormat,
-                onTap: () => _selectDate(context, false),
-              ),
+          FadeInRight(
+            delay: const Duration(milliseconds: 200),
+            child: _buildMaintenanceCard(
+              context: context,
+              title: 'Lịch Thay Nhớt Máy',
+              icon: FluentIcons.drop_24_filled,
+              date: vm.oilChangeDate,
+              daysLeft: vm.daysUntilOilChange,
+              dateFormat: dateFormat,
+              onTap: () => _selectDate(context, false),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -116,11 +122,19 @@ class MaintenanceScreen extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isWarning ? Colors.red.withOpacity(0.5) : Colors.transparent,
+          color: isWarning
+              ? Colors.redAccent.withValues(alpha: 0.4)
+              : Colors.white.withValues(alpha: 0.9),
+          width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isWarning ? Colors.red : Colors.black).withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: const Color(0xFF2A8B88).withValues(alpha: 0.06),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -141,16 +155,18 @@ class MaintenanceScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isWarning
                         ? Colors.red.shade50
-                        : Colors.grey.shade100,
+                        : const Color(0xFF2A8B88).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     icon,
-                    color: isWarning ? Colors.red : Colors.black87,
-                    size: 32,
+                    color: isWarning
+                        ? Colors.redAccent
+                        : const Color(0xFF2A8B88),
+                    size: 28,
                   ),
                 ),
-                const SizedBox(width: 20),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,18 +179,19 @@ class MaintenanceScreen extends StatelessWidget {
                           color: Colors.black87,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       if (date == null)
-                        const Text(
+                        Text(
                           'Chưa thiết lập',
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(color: Colors.grey.shade400),
                         )
                       else ...[
                         Text(
                           'Đến hạn: ${dateFormat.format(date)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.black54,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -185,16 +202,18 @@ class MaintenanceScreen extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: isWarning ? Colors.red : Colors.green,
+                            color: isWarning
+                                ? Colors.redAccent
+                                : const Color(0xFF2A8B88),
                           ),
                         ),
                       ],
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   FluentIcons.chevron_right_24_regular,
-                  color: Colors.grey,
+                  color: Colors.grey.shade400,
                 ),
               ],
             ),

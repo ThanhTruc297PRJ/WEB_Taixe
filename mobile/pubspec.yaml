@@ -73,6 +73,8 @@ dependencies:
   firebase_storage: ^12.4.10
   firebase_messaging: ^15.2.10
   geocoding: ^5.0.0
+  just_audio: ^0.10.6
+  url_launcher: ^6.2.10
 
 dev_dependencies:
   flutter_test:

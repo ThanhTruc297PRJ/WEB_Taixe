@@ -50,11 +50,11 @@ class MyApp extends StatelessWidget {
       title: 'Hệ Thống Giám Sát Tài Xế',
       theme: ThemeData(
         useMaterial3: true,
-        textTheme: GoogleFonts.montserratTextTheme(ThemeData.dark().textTheme),
-        scaffoldBackgroundColor: const Color(0xFF0B101E),
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.cyanAccent,
-          surface: Color(0xFF151D30),
+        textTheme: GoogleFonts.montserratTextTheme(ThemeData.light().textTheme),
+        scaffoldBackgroundColor: const Color(0xFFF9FAFB),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF2A8B88),
+          surface: Colors.white,
         ),
       ),
       home: const _Gate(),
@@ -63,7 +63,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Cổng vào: chọn màn theo trạng thái đăng nhập + duyệt tài khoản.
 class _Gate extends StatelessWidget {
   const _Gate();
 
@@ -72,7 +71,11 @@ class _Gate extends StatelessWidget {
     final gate = context.watch<AuthViewModel>().gate;
     switch (gate) {
       case GateState.loading:
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        return const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(color: Color(0xFF2A8B88)),
+          ),
+        );
       case GateState.login:
         return const LoginScreen();
       case GateState.register:
@@ -96,21 +99,23 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
+  int _currentIndex = 2; // Mặc định mở tab 2 là GIÁM SÁT AI ở chính giữa
 
+  // Sắp xếp đúng thứ tự các màn hình:
+  // 0: Bản đồ, 1: Báo cáo, 2: Giám sát AI (TRỌNG TÂM Ở GIỮA), 3: Bảo trì, 4: Giải trí, 5: Tài khoản
   final List<Widget> _screens = [
-    const MonitoringScreen(),
-    const MapScreen(),
-    const ReportScreen(),
-    const MaintenanceScreen(),
-    const MusicScreen(),
-    const ProfileScreen(),
+    const MapScreen(), // Index 0
+    const ReportScreen(), // Index 1
+    const MonitoringScreen(), // Index 2 (Chính giữa)
+    const MaintenanceScreen(), // Index 3
+    const MusicScreen(), // Index 4
+    const ProfileScreen(), // Index 5 (Tài khoản)
   ];
 
   final List<String> _titles = [
-    'Giám Sát AI',
     'Bản Đồ Hành Trình',
     'Báo Cáo Sự Cố',
+    'Giám Sát AI Trọng Tâm',
     'Bảo Trì Phương Tiện',
     'Giải Trí An Toàn',
     'Tài Khoản Cá Nhân',
@@ -119,8 +124,6 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    // Vào tới đây nghĩa là hồ sơ đã active (GateState.ready) -> đăng ký nhận
-    // thông báo đẩy (nhắc lịch, cảnh báo sự cố, lệnh phát loa từ admin...).
     final driverId = context.read<AuthViewModel>().account?.id;
     if (driverId != null) {
       FcmService().init(driverId);
@@ -130,34 +133,64 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final musicVM = context.watch<MusicViewModel>();
+    final account = context.watch<AuthViewModel>().account;
+    final activeIndex = _currentIndex == 5 ? 5 : _currentIndex;
 
     return Scaffold(
       extendBody: true,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         flexibleSpace: ClipRect(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              color: const Color(0xFF0B101E).withValues(alpha: 0.75),
-            ),
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(color: Colors.white.withValues(alpha: 0.85)),
           ),
         ),
         title: Text(
-          _titles[_currentIndex],
+          _titles[activeIndex],
           style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+            fontWeight: FontWeight.w800,
             fontSize: 17,
-            letterSpacing: 1.1,
+            letterSpacing: 0.5,
           ),
         ),
+        actions: [
+          // Nút Profile luôn hiển thị ở góc trên bên phải mọi trang
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: GestureDetector(
+              onTap: () => setState(() => _currentIndex = 5),
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _currentIndex == 5
+                        ? const Color(0xFF2A8B88)
+                        : Colors.grey.shade300,
+                    width: 2,
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.white,
+                  backgroundImage: NetworkImage(
+                    account?.photoUrl ??
+                        'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Stack(
         children: [
-          IndexedStack(index: _currentIndex, children: _screens),
+          IndexedStack(index: activeIndex, children: _screens),
           if (musicVM.currentTrack != null)
             Positioned(
               bottom: 95,
@@ -174,62 +207,83 @@ class _MainScreenState extends State<MainScreen> {
         duration: const Duration(milliseconds: 700),
         child: Padding(
           padding: const EdgeInsets.only(left: 16, right: 16, bottom: 18),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                height: 68,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.12),
+          child: Container(
+            height: 68,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2A8B88).withValues(alpha: 0.1),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // 0: Bản đồ
+                _buildNavItem(
+                  0,
+                  FluentIcons.map_24_regular,
+                  FluentIcons.map_24_filled,
+                ),
+                // 1: Báo cáo
+                _buildNavItem(
+                  1,
+                  FluentIcons.warning_24_regular,
+                  FluentIcons.warning_24_filled,
+                ),
+
+                // 2: GIÁM SÁT AI (Nút tròn nổi bật chính giữa)
+                Transform.translate(
+                  offset: const Offset(0, -10),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _currentIndex = 2),
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2A8B88), Color(0xFF175452)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF2A8B88,
+                            ).withValues(alpha: 0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        FluentIcons.video_person_24_filled,
+                        color: Colors.white,
+                        size: 26,
+                      ),
+                    ),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildNavItem(
-                      0,
-                      FluentIcons.video_person_24_regular,
-                      FluentIcons.video_person_24_filled,
-                    ),
-                    _buildNavItem(
-                      1,
-                      FluentIcons.map_24_regular,
-                      FluentIcons.map_24_filled,
-                    ),
-                    _buildNavItem(
-                      2,
-                      FluentIcons.warning_24_regular,
-                      FluentIcons.warning_24_filled,
-                    ),
-                    _buildNavItem(
-                      3,
-                      FluentIcons.wrench_24_regular,
-                      FluentIcons.wrench_24_filled,
-                    ),
-                    _buildNavItem(
-                      4,
-                      FluentIcons.music_note_1_24_regular,
-                      FluentIcons.music_note_1_24_filled,
-                    ),
-                    _buildNavItem(
-                      5,
-                      FluentIcons.person_24_regular,
-                      FluentIcons.person_24_filled,
-                    ),
-                  ],
+
+                // 3: Bảo trì
+                _buildNavItem(
+                  3,
+                  FluentIcons.wrench_24_regular,
+                  FluentIcons.wrench_24_filled,
                 ),
-              ),
+                // 4: Giải trí
+                _buildNavItem(
+                  4,
+                  FluentIcons.music_note_1_24_regular,
+                  FluentIcons.music_note_1_24_filled,
+                ),
+              ],
             ),
           ),
         ),
@@ -244,16 +298,16 @@ class _MainScreenState extends State<MainScreen> {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected
-              ? Colors.cyanAccent.withValues(alpha: 0.15)
+              ? const Color(0xFF2A8B88).withValues(alpha: 0.1)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Icon(
           isSelected ? iconFilled : iconRegular,
-          color: isSelected ? Colors.cyanAccent : Colors.grey.shade400,
+          color: isSelected ? const Color(0xFF2A8B88) : Colors.grey.shade400,
           size: 24,
         ),
       ),
@@ -261,114 +315,93 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildGlassMiniPlayer(MusicViewModel musicVM) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF151D30).withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.cyanAccent.withValues(alpha: 0.35),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.cyanAccent.withValues(alpha: 0.1),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: musicVM.currentTrack!.artworkUrl != null
-                    ? Image.network(
-                        musicVM.currentTrack!.artworkUrl!,
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          width: 44,
-                          height: 44,
-                          color: Colors.white10,
-                          child: const Icon(
-                            FluentIcons.music_note_1_24_filled,
-                            color: Colors.cyanAccent,
-                          ),
-                        ),
-                      )
-                    : Container(
-                        width: 44,
-                        height: 44,
-                        color: Colors.cyanAccent.withValues(alpha: 0.15),
-                        child: const Icon(
-                          FluentIcons.folder_open_24_filled,
-                          color: Colors.cyanAccent,
-                          size: 20,
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      musicVM.currentTrack!.title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.white,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+        ],
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: musicVM.currentTrack!.artworkUrl != null
+                ? Image.network(
+                    musicVM.currentTrack!.artworkUrl!,
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                  )
+                : Container(
+                    width: 48,
+                    height: 48,
+                    color: const Color(0xFF2A8B88).withValues(alpha: 0.1),
+                    child: const Icon(
+                      FluentIcons.music_note_1_24_filled,
+                      color: Color(0xFF2A8B88),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      musicVM.currentTrack!.artist,
-                      style: TextStyle(
-                        color: Colors.cyanAccent.withValues(alpha: 0.8),
-                        fontSize: 12,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.cyanAccent,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    musicVM.isPlaying
-                        ? FluentIcons.pause_24_filled
-                        : FluentIcons.play_24_filled,
-                    color: Colors.black,
-                    size: 20,
                   ),
-                  onPressed: () => musicVM.togglePlayPause(),
-                ),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(
-                  FluentIcons.dismiss_24_regular,
-                  color: Colors.grey,
-                  size: 20,
-                ),
-                onPressed: () => musicVM.closePlayer(),
-              ),
-            ],
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  musicVM.currentTrack!.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  musicVM.currentTrack!.artist,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF2A8B88),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: Icon(
+                musicVM.isPlaying
+                    ? FluentIcons.pause_24_filled
+                    : FluentIcons.play_24_filled,
+                color: Colors.white,
+                size: 20,
+              ),
+              onPressed: () => musicVM.togglePlayPause(),
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: Icon(
+              FluentIcons.dismiss_24_regular,
+              color: Colors.grey.shade400,
+              size: 24,
+            ),
+            onPressed: () => musicVM.closePlayer(),
+          ),
+        ],
       ),
     );
   }

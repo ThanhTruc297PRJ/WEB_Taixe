@@ -54,4 +54,19 @@ class DriverApi {
   /// foreground (quyết định có chủ đích, không theo dõi nền).
   Future<void> updateSpeed(String driverId, double speedKmh) =>
       _c.put('/drivers/$driverId/speed', {'speed_kmh': speedKmh});
+
+  /// Cập nhật thông tin chi tiết của tài xế (Họ tên, SĐT, Số bằng lái)
+  Future<DriverAccount> updateDriverProfile(
+    String driverId,
+    String name,
+    String phone,
+    String licenseNumber,
+  ) async {
+    final j = await _c.put('/drivers/$driverId', {
+      'name': name,
+      'phone': phone,
+      'license_number': licenseNumber,
+    });
+    return DriverAccount.fromJson(j as Map<String, dynamic>);
+  }
 }
