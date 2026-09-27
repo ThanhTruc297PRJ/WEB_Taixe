@@ -53,53 +53,69 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _initLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      await Geolocator.openLocationSettings();
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        setState(() => _initialPosition = _defaultLocation);
-        return;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      setState(() => _initialPosition = _defaultLocation);
-      return;
-    }
-
+    print('=================================');
+    print('[DEBUG MAP] BẮT ĐẦU TẢI MAP');
     try {
+      print('[DEBUG MAP] Bước 1: Gọi kiểm tra Location Service...');
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      print('[DEBUG MAP] Trạng thái Service: $serviceEnabled');
+
+      print('[DEBUG MAP] Bước 2: Gọi kiểm tra Quyền (Permission)...');
+      LocationPermission permission = await Geolocator.checkPermission();
+      print('[DEBUG MAP] Trạng thái Quyền ban đầu: $permission');
+
+      if (permission == LocationPermission.denied) {
+        print('[DEBUG MAP] Bước 3: Đang yêu cầu cấp quyền...');
+        permission = await Geolocator.requestPermission();
+        print('[DEBUG MAP] Trạng thái Quyền sau khi xin: $permission');
+      }
+
+      print('[DEBUG MAP] Bước 4: Đang gọi lệnh dò GPS (getCurrentPosition)...');
       Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 5),
         ),
       );
-      setState(() {
-        _initialPosition = LatLng(position.latitude, position.longitude);
-      });
-      _animateToPosition(_initialPosition!);
-    } catch (_) {
-      setState(() => _initialPosition = _defaultLocation);
-    }
+      print(
+        '[DEBUG MAP] Bước 5: THÀNH CÔNG! Đã lấy được tọa độ: ${position.latitude}, ${position.longitude}',
+      );
 
+      if (mounted) {
+        setState(() {
+          _initialPosition = LatLng(position.latitude, position.longitude);
+        });
+        _animateToPosition(_initialPosition!);
+      }
+    } catch (e) {
+      print('[DEBUG MAP] 🛑 CÓ LỖI XẢY RA: $e');
+      if (mounted) {
+        setState(() => _initialPosition = _defaultLocation);
+      }
+    }
+    print('=================================');
+
+    // Chạy stream ở background
     _positionStream =
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
             distanceFilter: 5,
           ),
-        ).listen((Position position) {
-          final newLatLng = LatLng(position.latitude, position.longitude);
-          if (_polylines.isEmpty) {
-            _animateToPosition(newLatLng);
-          }
-          _maybeReportSpeed(position);
-        });
+        ).listen(
+          (Position position) {
+            if (mounted) {
+              final newLatLng = LatLng(position.latitude, position.longitude);
+              if (_polylines.isEmpty) {
+                _animateToPosition(newLatLng);
+              }
+              _maybeReportSpeed(position);
+            }
+          },
+          onError: (e) {
+            print("[DEBUG MAP] Lỗi stream GPS: $e");
+          },
+        );
   }
 
   Future<void> _animateToPosition(LatLng target) async {

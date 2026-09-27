@@ -134,6 +134,56 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                 const SizedBox(height: 16),
                 _StatusCard(vm: vm),
                 const SizedBox(height: 16),
+
+                // NÚT TẮT CHUÔNG ĐỘC LẬP
+                if (vm.isMonitoring &&
+                    vm.lastDrowsyProbability != null &&
+                    vm.lastDrowsyProbability! >= vm.drowsyThreshold) ...[
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Colors.orange, Colors.deepOrange],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: SizedBox(
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () {
+                          // Cần gọi hàm stopAlarm() từ ViewModel
+                          vm.stopAlarm();
+                        },
+                        icon: const Icon(Icons.volume_off_rounded),
+                        label: const Text(
+                          'Tắt chuông cảnh báo',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // NÚT BẮT ĐẦU / DỪNG GIÁM SÁT
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -320,13 +370,14 @@ class _StatusCard extends StatelessWidget {
     double? probability,
     double threshold,
   ) {
-    if (probability == null)
+    if (probability == null) {
       return (
         Icons.analytics,
         const Color(0xFF2A8B88),
         const Color(0xFF2A8B88).withValues(alpha: 0.1),
         'AI đang phân tích...',
       );
+    }
     final percent = (probability * 100).toStringAsFixed(0);
     if (probability >= threshold) {
       return (

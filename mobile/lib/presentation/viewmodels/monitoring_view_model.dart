@@ -58,6 +58,9 @@ class MonitoringViewModel extends ChangeNotifier {
   double? _smoothedProb;
   int _framesSinceFace = 0;
 
+  // Biến cờ kiểm soát trạng thái tắt chuông chủ động
+  bool _isAlarmMuted = false;
+
   MonitoringPhase phase = MonitoringPhase.idle;
   double? lastDrowsyProbability;
   List<EventLog> recentLogs = const [];
@@ -108,6 +111,7 @@ class MonitoringViewModel extends ChangeNotifier {
     _framesSinceFace = 0;
     _lastIncidentAt = null;
     lastDrowsyProbability = null;
+    _isAlarmMuted = false; // Đặt lại cờ khi bắt đầu
     phase = MonitoringPhase.monitoring;
 
     try {
@@ -133,6 +137,14 @@ class MonitoringViewModel extends ChangeNotifier {
     phase = MonitoringPhase.idle;
     lastDrowsyProbability = null;
     _smoothedProb = null;
+    _isAlarmMuted = false;
+    notifyListeners();
+  }
+
+  // Hàm được gọi khi bấm nút "Tắt chuông cảnh báo"
+  void stopAlarm() {
+    _isAlarmMuted = true;
+    _alertService.stopAlert();
     notifyListeners();
   }
 
@@ -209,7 +221,10 @@ class MonitoringViewModel extends ChangeNotifier {
     );
 
     if (isDrowsy) {
-      _alertService.playWarningAlert();
+      // Chỉ phát chuông nếu người dùng chưa bấm tắt
+      if (!_isAlarmMuted) {
+        _alertService.playWarningAlert();
+      }
 
       final log = await _eventLogRepository.insert(
         EventLog(
@@ -224,6 +239,8 @@ class MonitoringViewModel extends ChangeNotifier {
 
       unawaited(_maybeCaptureIncident(probability, now));
     } else {
+      // Đặt lại cờ và tắt chuông khi người dùng đã tỉnh táo trở lại
+      _isAlarmMuted = false;
       _alertService.stopAlert();
     }
   }
