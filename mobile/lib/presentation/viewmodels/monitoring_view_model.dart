@@ -15,14 +15,8 @@ import '../../services/ml/landmark_feature_service.dart';
 import '../../services/ml/tflite_model_service.dart';
 import '../../services/monitoring/monitoring_task_handler.dart';
 
-/// Model MLP-Feature dự đoán theo từng khung + làm mượt EMA, không còn giai
-/// đoạn hiệu chỉnh baseline như model SVM cũ — chỉ còn idle / monitoring.
 enum MonitoringPhase { idle, monitoring }
 
-/// ViewModel điều phối camera + landmark + đặc trưng + model + cảnh báo + log.
-///
-/// Luồng mỗi khung (~6Hz): landmark -> 11 đặc trưng -> model -> EMA
-/// (s = beta*s + (1-beta)*p) -> so threshold -> cảnh báo + ghi log.
 class MonitoringViewModel extends ChangeNotifier {
   MonitoringViewModel({
     CameraFrameBuffer? cameraFrameBuffer,
@@ -31,14 +25,14 @@ class MonitoringViewModel extends ChangeNotifier {
     EventLogRepository? eventLogRepository,
     FeatureWindowAggregator? featureWindowAggregator,
     IncidentApi? incidentApi,
-  })  : _cameraFrameBuffer = cameraFrameBuffer ?? CameraFrameBuffer(),
-        _landmarkFeatureService =
-            landmarkFeatureService ?? LandmarkFeatureService(),
-        _tfliteModelService = tfliteModelService ?? TFLiteModelService(),
-        _eventLogRepository = eventLogRepository ?? EventLogRepository(),
-        _featureWindowAggregator =
-            featureWindowAggregator ?? FeatureWindowAggregator(),
-        _incidentApi = incidentApi ?? IncidentApi();
+  }) : _cameraFrameBuffer = cameraFrameBuffer ?? CameraFrameBuffer(),
+       _landmarkFeatureService =
+           landmarkFeatureService ?? LandmarkFeatureService(),
+       _tfliteModelService = tfliteModelService ?? TFLiteModelService(),
+       _eventLogRepository = eventLogRepository ?? EventLogRepository(),
+       _featureWindowAggregator =
+           featureWindowAggregator ?? FeatureWindowAggregator(),
+       _incidentApi = incidentApi ?? IncidentApi();
 
   final CameraFrameBuffer _cameraFrameBuffer;
   final LandmarkFeatureService _landmarkFeatureService;
@@ -49,27 +43,23 @@ class MonitoringViewModel extends ChangeNotifier {
 
   final AlertService _alertService = AlertService();
 
-  // Sự cố: quay [_clipDuration] giây từ lúc phát hiện, tối đa 1 clip mỗi
-  // [_incidentCooldown] (tài xế buồn ngủ liên tục không đẻ ra hàng loạt clip).
   static const _clipDuration = Duration(seconds: 10);
   static const _incidentCooldown = Duration(seconds: 60);
   DateTime? _lastIncidentAt;
   bool _capturingIncident = false;
   bool get capturingIncident => _capturingIncident;
 
-  // ~6Hz: khớp EFF_FPS=6 (SAMPLE_INTERVAL=5 trên video 30fps) lúc train.
   static const _sampleInterval = Duration(milliseconds: 166);
   DateTime? _lastSampleAt;
 
   static const _statusMinInterval = Duration(milliseconds: 1000);
   DateTime? _lastStatusAt;
 
-  // EMA state cho xác suất đầu ra.
   double? _smoothedProb;
   int _framesSinceFace = 0;
 
   MonitoringPhase phase = MonitoringPhase.idle;
-  double? lastDrowsyProbability; // đã EMA
+  double? lastDrowsyProbability;
   List<EventLog> recentLogs = const [];
 
   bool get isMonitoring => phase != MonitoringPhase.idle;
@@ -146,6 +136,16 @@ class MonitoringViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> switchCamera() async {
+    if (!isMonitoring) return;
+    try {
+      await _cameraFrameBuffer.switchCamera(onFrame: _onFrame);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Lỗi chuyển camera: $e');
+    }
+  }
+
   void _sendStatus(String text) {
     final now = DateTime.now();
     if (_lastStatusAt != null &&
@@ -192,8 +192,9 @@ class MonitoringViewModel extends ChangeNotifier {
     final raw = _tfliteModelService.predictDrowsyProbability(features);
 
     final beta = _tfliteModelService.meta?.emaBeta ?? 0.7;
-    _smoothedProb =
-        _smoothedProb == null ? raw : beta * _smoothedProb! + (1 - beta) * raw;
+    _smoothedProb = _smoothedProb == null
+        ? raw
+        : beta * _smoothedProb! + (1 - beta) * raw;
     final probability = _smoothedProb!;
     lastDrowsyProbability = probability;
     notifyListeners();
@@ -227,8 +228,6 @@ class MonitoringViewModel extends ChangeNotifier {
     }
   }
 
-  /// Quay 10s từ lúc phát hiện buồn ngủ rồi gửi lên backend. Chạy nền, không
-  /// chặn vòng nhận diện; có cooldown để không gửi dồn dập.
   Future<void> _maybeCaptureIncident(double confidence, DateTime at) async {
     if (_capturingIncident) return;
     if (_lastIncidentAt != null &&
@@ -246,7 +245,6 @@ class MonitoringViewModel extends ChangeNotifier {
     } catch (_) {
       clipPath = null;
     } finally {
-      // Luôn bật lại stream để nhận diện tiếp, kể cả khi quay lỗi.
       try {
         await _cameraFrameBuffer.resumeStream(onFrame: _onFrame);
       } catch (_) {}
@@ -259,9 +257,7 @@ class MonitoringViewModel extends ChangeNotifier {
           detectedAt: at,
           confidence: confidence,
         );
-      } catch (_) {
-        // best-effort: mất mạng thì bỏ qua, không làm phiền tài xế đang lái.
-      }
+      } catch (_) {}
     }
     try {
       if (clipPath != null) {

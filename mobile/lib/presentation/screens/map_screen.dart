@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../viewmodels/auth_view_model.dart';
@@ -17,16 +19,20 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   final _driverApi = DriverApi();
+  final TextEditingController _startController = TextEditingController();
+  final TextEditingController _endController = TextEditingController();
+
   LatLng? _initialPosition;
   StreamSubscription<Position>? _positionStream;
   DateTime? _lastSpeedSentAt;
 
+  final Set<Polyline> _polylines = {};
+  final Set<Marker> _markers = {};
+  bool _isLoadingRoute = false;
+
   static const LatLng _defaultLocation = LatLng(10.762622, 106.660172);
   static const _speedReportInterval = Duration(seconds: 10);
 
-  /// Báo tốc độ lên web admin — điều tiết (không gửi mỗi lần vị trí đổi, chỉ
-  /// tối đa 1 lần/10s) để đỡ tốn pin/mạng và không vượt rate limit backend.
-  /// CHỈ chạy khi màn này đang mở (app foreground) — không có dịch vụ nền.
   void _maybeReportSpeed(Position position) {
     final now = DateTime.now();
     if (_lastSpeedSentAt != null &&
@@ -36,11 +42,8 @@ class _MapScreenState extends State<MapScreen> {
     final driverId = context.read<AuthViewModel>().account?.id;
     if (driverId == null) return;
     _lastSpeedSentAt = now;
-    final speedKmh = position.speed * 3.6; // m/s -> km/h
-    _driverApi.updateSpeed(driverId, speedKmh).catchError((_) {
-      // Lỗi mạng lúc báo tốc độ không cần làm phiền tài xế — bỏ qua, lần
-      // cập nhật vị trí kế tiếp sẽ tự thử lại.
-    });
+    final speedKmh = position.speed * 3.6;
+    _driverApi.updateSpeed(driverId, speedKmh).catchError((_) {});
   }
 
   @override
@@ -73,8 +76,8 @@ class _MapScreenState extends State<MapScreen> {
       Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 5),
         ),
-        timeLimit: const Duration(seconds: 5),
       );
       setState(() {
         _initialPosition = LatLng(position.latitude, position.longitude);
@@ -92,7 +95,9 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ).listen((Position position) {
           final newLatLng = LatLng(position.latitude, position.longitude);
-          _animateToPosition(newLatLng);
+          if (_polylines.isEmpty) {
+            _animateToPosition(newLatLng);
+          }
           _maybeReportSpeed(position);
         });
   }
@@ -108,9 +113,182 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  Future<LatLng?> _getCoordinates(String address) async {
+    final trimmed = address.trim();
+    final coordRegex = RegExp(r'^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$');
+    if (coordRegex.hasMatch(trimmed)) {
+      final parts = trimmed.split(',');
+      return LatLng(
+        double.parse(parts[0].trim()),
+        double.parse(parts[1].trim()),
+      );
+    }
+
+    final query =
+        trimmed.toLowerCase().contains('vietnam') ||
+            trimmed.toLowerCase().contains('việt nam')
+        ? trimmed
+        : '$trimmed, Vietnam';
+
+    try {
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=1&countrycodes=vn',
+      );
+      final response = await http.get(
+        url,
+        headers: {
+          'User-Agent': 'DriverMonitoringSystemApp/1.0',
+          'Accept-Language': 'vi,en',
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is List && data.isNotEmpty) {
+          return LatLng(
+            double.parse(data[0]['lat']),
+            double.parse(data[0]['lon']),
+          );
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _fetchRoute() async {
+    if (_startController.text.trim().isEmpty ||
+        _endController.text.trim().isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingRoute = true;
+      _polylines.clear();
+      _markers.clear();
+    });
+
+    try {
+      LatLng? startLatLng;
+      final startText = _startController.text.trim().toLowerCase();
+
+      if ((startText == 'vị trí hiện tại' ||
+              startText == 'my location' ||
+              startText.isEmpty) &&
+          _initialPosition != null) {
+        startLatLng = _initialPosition;
+      } else {
+        startLatLng = await _getCoordinates(_startController.text);
+      }
+
+      final endLatLng = await _getCoordinates(_endController.text);
+
+      if (startLatLng == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không tìm thấy: ${_startController.text}')),
+        );
+        return;
+      }
+
+      if (endLatLng == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không tìm thấy: ${_endController.text}')),
+        );
+        return;
+      }
+
+      final url = Uri.parse(
+        'https://router.project-osrm.org/route/v1/driving/'
+        '${startLatLng.longitude},${startLatLng.latitude};${endLatLng.longitude},${endLatLng.latitude}'
+        '?geometries=geojson&overview=full',
+      );
+
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final routes = data['routes'] as List?;
+        if (routes == null || routes.isEmpty) {
+          throw Exception('Không có tuyến đường phù hợp');
+        }
+
+        final coords = routes[0]['geometry']['coordinates'] as List;
+        final routePoints = coords
+            .map(
+              (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+            )
+            .toList();
+
+        setState(() {
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('route'),
+              points: routePoints,
+              color: const Color(0xFF00E5FF),
+              width: 5,
+            ),
+          );
+          _markers.add(
+            Marker(
+              markerId: const MarkerId('start'),
+              position: startLatLng!,
+              infoWindow: const InfoWindow(title: 'Điểm bắt đầu'),
+            ),
+          );
+          _markers.add(
+            Marker(
+              markerId: const MarkerId('end'),
+              position: endLatLng,
+              infoWindow: const InfoWindow(title: 'Điểm đến'),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueGreen,
+              ),
+            ),
+          );
+        });
+
+        final bounds = _boundsFromLatLngList(routePoints);
+        final GoogleMapController mapController = await _controller.future;
+        mapController.animateCamera(CameraUpdate.newLatLngBounds(bounds, 60));
+      } else {
+        throw Exception('Lỗi kết nối máy chủ OSRM (${response.statusCode})');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingRoute = false);
+      }
+    }
+  }
+
+  LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
+    double? x0, x1, y0, y1;
+    for (final latLng in list) {
+      if (x0 == null) {
+        x0 = x1 = latLng.latitude;
+        y0 = y1 = latLng.longitude;
+      } else {
+        if (latLng.latitude > x1!) x1 = latLng.latitude;
+        if (latLng.latitude < x0) x0 = latLng.latitude;
+        if (latLng.longitude > y1!) y1 = latLng.longitude;
+        if (latLng.longitude < y0!) y0 = latLng.longitude;
+      }
+    }
+    return LatLngBounds(
+      northeast: LatLng(x1!, y1!),
+      southwest: LatLng(x0!, y0!),
+    );
+  }
+
   @override
   void dispose() {
     _positionStream?.cancel();
+    _startController.dispose();
+    _endController.dispose();
     super.dispose();
   }
 
@@ -133,11 +311,120 @@ class _MapScreenState extends State<MapScreen> {
                   compassEnabled: true,
                   trafficEnabled: true,
                   zoomControlsEnabled: false,
+                  polylines: _polylines,
+                  markers: _markers,
+                  padding: const EdgeInsets.only(top: 170),
                   onMapCreated: (GoogleMapController controller) {
                     if (!_controller.isCompleted) {
                       _controller.complete(controller);
                     }
                   },
+                ),
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 8,
+                  left: 16,
+                  right: 16,
+                  child: Card(
+                    color: const Color(0xFF131927),
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: Color(0xFF1E293B)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(
+                            controller: _startController,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: InputDecoration(
+                              hintText: 'Điểm đi (hoặc "Vị trí hiện tại")',
+                              hintStyle: const TextStyle(color: Colors.white54),
+                              prefixIcon: const Icon(
+                                Icons.my_location,
+                                color: Color(0xFF00E5FF),
+                              ),
+                              suffixIcon: IconButton(
+                                icon: const Icon(
+                                  Icons.gps_fixed,
+                                  color: Color(0xFF00E5FF),
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  _startController.text = 'Vị trí hiện tại';
+                                },
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFF1E2638),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _endController,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: InputDecoration(
+                              hintText: 'Nhập điểm đến (VD: Buôn Ma Thuột)',
+                              hintStyle: const TextStyle(color: Colors.white54),
+                              prefixIcon: const Icon(
+                                Icons.location_on,
+                                color: Color(0xFFFF5252),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFF1E2638),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: ElevatedButton(
+                              onPressed: _isLoadingRoute ? null : _fetchRoute,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF00E5FF),
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: _isLoadingRoute
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.black,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Tìm đường',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

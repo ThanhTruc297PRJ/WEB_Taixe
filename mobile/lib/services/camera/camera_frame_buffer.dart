@@ -4,13 +4,6 @@ import 'dart:ui';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detection.dart';
 
-/// Mở camera trước (tài xế) và chuyển từng khung hình CameraX/AVFoundation
-/// thành [InputImage] để đưa vào các model AI (SUB-03/TASK-A02).
-///
-/// Dùng [ImageFormatGroup.nv21] (Android) / [ImageFormatGroup.bgra8888] (iOS)
-/// khi mở camera để mỗi [CameraImage] chỉ có 1 plane duy nhất — tránh phải tự
-/// ghép 3 plane của YUV_420_888, vốn là nguồn lỗi phổ biến nhất khi nối
-/// `camera` với ML Kit.
 class CameraFrameBuffer {
   CameraController? _controller;
   CameraDescription? _camera;
@@ -35,8 +28,35 @@ class CameraFrameBuffer {
       camera,
       ResolutionPreset.medium,
       enableAudio: false,
-      imageFormatGroup:
-          Platform.isAndroid ? ImageFormatGroup.nv21 : ImageFormatGroup.bgra8888,
+      imageFormatGroup: Platform.isAndroid
+          ? ImageFormatGroup.nv21
+          : ImageFormatGroup.bgra8888,
+    );
+    _controller = controller;
+
+    await controller.initialize();
+    await _startStream(onFrame);
+  }
+
+  Future<void> switchCamera({
+    required void Function(InputImage image) onFrame,
+  }) async {
+    final cameras = await availableCameras();
+    if (cameras.isEmpty) return;
+
+    int currentIndex = cameras.indexWhere((c) => c.name == _camera?.name);
+    final nextCamera = cameras[(currentIndex + 1) % cameras.length];
+
+    await stop();
+
+    _camera = nextCamera;
+    final controller = CameraController(
+      nextCamera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+      imageFormatGroup: Platform.isAndroid
+          ? ImageFormatGroup.nv21
+          : ImageFormatGroup.bgra8888,
     );
     _controller = controller;
 
@@ -54,9 +74,6 @@ class CameraFrameBuffer {
     _isStreaming = true;
   }
 
-  /// Quay 1 clip [duration] giây, trả đường dẫn file .mp4. `camera` không cho
-  /// vừa stream frame vừa quay nên phải tạm dừng stream; gọi [resumeStream]
-  /// sau đó để nhận diện tiếp. Trả null nếu camera chưa sẵn sàng / lỗi.
   Future<String?> recordClip(Duration duration) async {
     final c = _controller;
     if (c == null || !c.value.isInitialized || c.value.isRecordingVideo) {
@@ -76,7 +93,6 @@ class CameraFrameBuffer {
     }
   }
 
-  /// Bật lại stream frame sau khi quay clip xong.
   Future<void> resumeStream({
     required void Function(InputImage image) onFrame,
   }) async {
@@ -107,7 +123,9 @@ class CameraFrameBuffer {
     final rotation = Platform.isAndroid
         ? InputImageRotationValue.fromRawValue(camera.sensorOrientation)
         : InputImageRotation.rotation0deg;
-    final format = Platform.isAndroid ? InputImageFormat.nv21 : InputImageFormat.bgra8888;
+    final format = Platform.isAndroid
+        ? InputImageFormat.nv21
+        : InputImageFormat.bgra8888;
     if (rotation == null) return null;
 
     final plane = image.planes.first;
