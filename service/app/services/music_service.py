@@ -149,8 +149,10 @@ def list_reported() -> list[dict]:
     return [t for t in list_tracks() if t.get("reported")]
 
 
-def report(track_id: str, reason: Optional[str]) -> Optional[dict]:
-    """Tài xế báo cáo bài hát không phù hợp."""
+def report(track_id: str, reason: Optional[str], driver_id: str) -> Optional[dict]:
+    """Tài xế báo cáo bài hát không phù hợp — vừa cộng dồn số liệu trên track
+    (cho hiển thị nhanh ở bảng), vừa lưu riêng từng lượt báo cáo (ai báo, lúc
+    nào, lý do gì) vào subcollection để admin xem lại chi tiết."""
     ref = db.collection(COLLECTION).document(track_id)
     if not ref.get().exists:
         return None
@@ -161,4 +163,19 @@ def report(track_id: str, reason: Optional[str]) -> Optional[dict]:
             "last_report_reason": reason,
         }
     )
+    ref.collection("reports").document().set(
+        {"driver_id": driver_id, "reason": reason, "reported_at": _now()}
+    )
     return {"id": track_id, **ref.get().to_dict()}
+
+
+def list_track_reports(track_id: str) -> list[dict]:
+    """Chi tiết từng lượt báo cáo của 1 bài hát — mới nhất trước."""
+    docs = (
+        db.collection(COLLECTION)
+        .document(track_id)
+        .collection("reports")
+        .order_by("reported_at", direction=firestore.Query.DESCENDING)
+        .stream()
+    )
+    return [{"id": d.id, **d.to_dict()} for d in docs]

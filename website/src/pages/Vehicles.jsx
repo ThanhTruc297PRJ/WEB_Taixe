@@ -278,7 +278,7 @@ function Vehicles() {
                       size="small"
                       icon={<ToolOutlined />}
                       className="flex-1"
-                      onClick={() => navigate('/maintenance')}
+                      onClick={() => navigate(`/maintenance?vehicle_id=${record.id}`)}
                     >
                       Lịch sử
                     </Button>

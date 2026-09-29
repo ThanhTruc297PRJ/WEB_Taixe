@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   App,
+  Alert,
   Button,
   DatePicker,
   Form,
@@ -14,6 +15,7 @@ import {
   Tag,
 } from 'antd'
 import { BellOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons'
+import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { listVehicles } from '../services/vehicles'
 import { listDrivers } from '../services/drivers'
@@ -54,6 +56,8 @@ const isOverdue = (record) =>
 
 function Maintenance() {
   const { message } = App.useApp()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const vehicleFilter = searchParams.get('vehicle_id')
   const [rows, setRows] = useState([])
   const [vehicles, setVehicles] = useState([])
   const [drivers, setDrivers] = useState([])
@@ -114,15 +118,16 @@ function Maintenance() {
   }, [drivers])
 
   const filtered = useMemo(() => {
-    const sorted = [...rows].sort((a, b) =>
+    let sorted = [...rows].sort((a, b) =>
       dayjs(a.scheduled_date).valueOf() - dayjs(b.scheduled_date).valueOf(),
     )
+    if (vehicleFilter) sorted = sorted.filter((r) => r.vehicle_id === vehicleFilter)
     if (statusFilter === 'all') return sorted
     if (statusFilter === 'overdue') return sorted.filter(isOverdue)
     if (statusFilter === 'pending')
       return sorted.filter((r) => r.status === 'pending' && !isOverdue(r))
     return sorted.filter((r) => r.status === statusFilter)
-  }, [rows, statusFilter])
+  }, [rows, statusFilter, vehicleFilter])
 
   const handleScanReminders = async () => {
     setScanning(true)
@@ -316,6 +321,23 @@ function Maintenance() {
           </Space>
         }
       />
+
+      {vehicleFilter && (
+        <Alert
+          className="mb-4"
+          type="info"
+          showIcon
+          closable
+          onClose={() => setSearchParams({})}
+          message={
+            <>
+              Đang chỉ xem lịch sử bảo trì của xe{' '}
+              <strong>{vehiclePlate[vehicleFilter] || vehicleFilter}</strong>.{' '}
+              <a onClick={() => setSearchParams({})}>Xem tất cả xe</a>
+            </>
+          }
+        />
+      )}
 
       <Space className="mb-4" wrap>
         <Select
