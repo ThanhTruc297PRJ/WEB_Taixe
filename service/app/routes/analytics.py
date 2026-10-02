@@ -1,10 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from app.core.security import get_current_admin
 from app.services.analytics_service import (
     get_driver_risk,
     get_drowsiness_by_hour,
 )
 
-router = APIRouter()
+# Dữ liệu rủi ro theo từng tài xế — chỉ admin được xem.
+router = APIRouter(dependencies=[Depends(get_current_admin)])
 
 
 @router.get("/driver-risk")
