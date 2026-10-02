@@ -63,10 +63,10 @@ Vite tự nhảy cổng vì 5173 đã bị chiếm) sẽ bị lỗi CORS.
 
 ```bash
 # Liệt kê máy ảo đã tạo
-C:\Users\<user>\AppData\Local\Android\Sdk\emulator\emulator.exe -list-avds
+"%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe" -list-avds
 
 # Khởi động máy ảo (dùng GPU thật cho ổn định, tránh crash/ANR)
-C:\Users\<user>\AppData\Local\Android\Sdk\emulator\emulator.exe -avd Pixel_5 -gpu host
+"%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe" -avd Pixel_5 -gpu host
 
 # Sau khi máy ảo boot xong, chạy app (trỏ về backend qua địa chỉ đặc biệt của emulator)
 cd D:\WEBTAIXE\driver_monitoring_support_system\mobile
@@ -75,6 +75,11 @@ flutter run -d emulator-5554 --dart-define=API_BASE_URL=http://10.0.2.2:8000
 
 `10.0.2.2` là địa chỉ đặc biệt Android dùng để trỏ về `localhost` của máy tính đang
 chạy emulator — không đổi được, không dùng `localhost` trực tiếp ở đây.
+
+Lệnh trên chạy trong **cmd**. Giữ nguyên dấu ngoặc kép — tên người dùng Windows có
+khoảng trắng (VD `C:\Users\Thanh Truc\...`) mà thiếu ngoặc kép sẽ báo lỗi
+`'C:\Users\Thanh' is not recognized`. Nếu dùng PowerShell thì đổi `%LOCALAPPDATA%`
+thành `$env:LOCALAPPDATA` và thêm `&` ở đầu lệnh.
 
 ### Trên điện thoại thật (cùng Wi-Fi với máy tính)
 
