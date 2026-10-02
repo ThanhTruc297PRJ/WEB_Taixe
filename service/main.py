@@ -9,6 +9,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from app.routes import analytics
 from app.core.config import settings
 from app.core.middleware import ip_whitelist_middleware, request_logging_middleware
 from app.core.rate_limit import limiter
@@ -18,6 +19,7 @@ from app.routes import (
     assistant,
     auth,
     consent,
+    driver_reports,
     drivers,
     incidents,
     inspection,
@@ -135,8 +137,16 @@ app.include_router(music.self_router)
 app.include_router(music.router)
 app.include_router(websocket.router)
 app.include_router(sync.router)
+app.include_router(driver_reports.self_router)
+app.include_router(driver_reports.router)
 app.include_router(admin_notifications.router)
+app.include_router(app_settings.self_router)
 app.include_router(app_settings.router)
+app.include_router(
+    analytics.router,
+    prefix="/analytics",
+    tags=["Analytics"]
+)
 
 
 @app.get("/health")

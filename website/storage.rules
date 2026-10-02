@@ -14,6 +14,11 @@ service firebase.storage {
       allow read: if true;
       allow write: if false;
     }
+    // Ảnh tài xế đính kèm khi tự gửi báo cáo từ app — cũng chỉ backend ghi.
+    match /driver_reports/{uid}/{file} {
+      allow read: if true;
+      allow write: if false;
+    }
 
     // Ảnh đại diện admin: chỉ chính chủ (đúng uid + có claim admin) mới ghi
     // được vào thư mục của mình. Đọc công khai — giống cách incident media

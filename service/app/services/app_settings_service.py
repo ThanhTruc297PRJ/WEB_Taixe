@@ -20,6 +20,10 @@ DEFAULTS = {
     "inspection_defaults": {
         "remind_days_before": 15,
     },
+    # Số app tài xế gọi khi bấm nút "Cứu hộ" — rỗng = app báo chưa cài đặt.
+    "contact": {
+        "company_hotline": "",
+    },
 }
 
 

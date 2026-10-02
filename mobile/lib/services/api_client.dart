@@ -14,6 +14,7 @@ class ApiException implements Exception {
 
 /// HTTP client cho backend FastAPI. Tự đính `Authorization: Bearer <idToken>`.
 ///
+/// baseUrl mặc định `http://10.0.2.2:8000` = localhost của máy chủ khi chạy
 /// trên emulator Android. Máy thật: truyền
 /// `--dart-define=API_BASE_URL=http://<IP-máy>:8000`.
 class ApiClient {
@@ -22,7 +23,7 @@ class ApiClient {
           baseUrl ??
           const String.fromEnvironment(
             'API_BASE_URL',
-            defaultValue: 'http://192.168.1.56:8000',
+            defaultValue: 'http://10.0.2.2:8000',
           ),
       _auth = auth ?? AuthService();
 

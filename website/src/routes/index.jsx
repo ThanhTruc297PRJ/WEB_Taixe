@@ -17,6 +17,8 @@ const Incidents = lazy(() => import('../pages/Incidents'))
 const Music = lazy(() => import('../pages/Music'))
 const Assistant = lazy(() => import('../pages/Assistant'))
 const Settings = lazy(() => import('../pages/Settings'))
+const CostReport = lazy(() => import('../pages/CostReport'))
+const DriverReports = lazy(() => import('../pages/DriverReports'))
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -32,7 +34,9 @@ const router = createBrowserRouter([
           { path: 'vehicles', element: <Vehicles /> },
           { path: 'maintenance', element: <Maintenance /> },
           { path: 'inspections', element: <Inspections /> },
+          { path: 'costs', element: <CostReport /> },
           { path: 'incidents', element: <Incidents /> },
+          { path: 'driver-reports', element: <DriverReports /> },
           { path: 'music', element: <Music /> },
           { path: 'assistant', element: <Assistant /> },
           { path: 'settings', element: <Settings /> },

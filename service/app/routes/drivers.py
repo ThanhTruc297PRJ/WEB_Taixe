@@ -103,6 +103,22 @@ def update_photo(
     return driver
 
 
+@self_router.put("/{driver_id}/profile")
+def update_my_profile(
+    driver_id: str,
+    payload: DriverRegister,
+    user: dict = Depends(get_current_active_driver),
+):
+    """Tài xế tự sửa thông tin cá nhân — chỉ đúng 3 trường này, không đụng
+    được status/presence/quyền (khác PUT /{driver_id} của admin nhận dict tự do)."""
+    if user["uid"] != driver_id:
+        raise HTTPException(status_code=403, detail="Không thể sửa tài xế khác")
+    driver = driver_service.update_driver(driver_id, payload.model_dump())
+    if driver is None:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    return driver
+
+
 class SpeedUpdate(BaseModel):
     speed_kmh: float
 

@@ -3,6 +3,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 
+import '../../services/api_client.dart';
+import '../../services/driver_report_api.dart';
+
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
 
@@ -14,12 +17,37 @@ class _ReportScreenState extends State<ReportScreen> {
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _noteController = TextEditingController();
+  final DriverReportApi _reportApi = DriverReportApi();
+  bool _submitting = false;
+  String? _hotline;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHotline();
+  }
+
+  Future<void> _loadHotline() async {
+    try {
+      final hotline = await _reportApi.companyHotline();
+      if (mounted) setState(() => _hotline = hotline);
+    } catch (_) {
+      // Mất mạng / lỗi tạm -> nút Cứu hộ tự báo chưa có số, không chặn màn hình.
+    }
+  }
+
+  void _toast(String text) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
         imageQuality: 80,
+        maxWidth: 1600,
       );
 
       if (pickedFile != null) {
@@ -28,9 +56,8 @@ class _ReportScreenState extends State<ReportScreen> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Không thể lấy ảnh: $e')));
+      if (!mounted) return;
+      _toast('Không thể lấy ảnh: $e');
     }
   }
 
@@ -112,14 +139,38 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  void _submitReport() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Đã lưu báo cáo sự cố!')));
-    setState(() {
-      _selectedImage = null;
-      _noteController.clear();
-    });
+  Future<void> _submitReport() async {
+    final note = _noteController.text.trim();
+    if (note.isEmpty && _selectedImage == null) {
+      _toast('Nhập mô tả hoặc đính kèm ảnh trước khi gửi');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _submitting = true);
+    try {
+      await _reportApi.submit(note: note, photo: _selectedImage);
+      if (!mounted) return;
+      _toast('Đã gửi báo cáo tới công ty');
+      setState(() {
+        _selectedImage = null;
+        _noteController.clear();
+      });
+    } on ApiException catch (e) {
+      if (mounted) _toast(e.message);
+    } catch (_) {
+      if (mounted) _toast('Không gửi được báo cáo — kiểm tra kết nối mạng rồi thử lại');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  void _callHotline() {
+    final hotline = _hotline;
+    if (hotline == null || hotline.isEmpty) {
+      _toast('Công ty chưa cài số cứu hộ — dùng các số khẩn cấp bên cạnh');
+      return;
+    }
+    _triggerEmergency('Cứu hộ của công ty', hotline.replaceAll(RegExp(r'[ .]'), ''));
   }
 
   // Hàm gọi điện thoại trực tiếp
@@ -269,23 +320,35 @@ class _ReportScreenState extends State<ReportScreen> {
             SizedBox(
               height: 52,
               child: ElevatedButton(
-                onPressed: _submitReport,
+                onPressed: _submitting ? null : _submitReport,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2A8B88),
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(
+                    0xFF2A8B88,
+                  ).withValues(alpha: 0.6),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: const Text(
-                  'Gửi Báo Cáo',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+                child: _submitting
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Gửi Báo Cáo',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
               ),
             ),
 
@@ -313,17 +376,30 @@ class _ReportScreenState extends State<ReportScreen> {
               children: [
                 Expanded(
                   child: _buildSosButton(
-                    title: 'Cứu hộ',
-                    subtitle: 'Giao thông',
-                    icon: Icons.car_repair_rounded,
-                    color: Colors.orange,
-                    onTap: () => _triggerEmergency(
-                      'Cứu hộ giao thông',
-                      '19001234',
-                    ), // Thay số điện thoại thực tế tại đây
+                    title: 'Cấp cứu',
+                    subtitle: '115',
+                    icon: Icons.medical_services_rounded,
+                    color: Colors.redAccent,
+                    onTap: () => _triggerEmergency('Cấp cứu', '115'),
                   ),
                 ),
                 const SizedBox(width: 10),
+                Expanded(
+                  child: _buildSosButton(
+                    title: 'Cứu hộ',
+                    subtitle: (_hotline?.isNotEmpty ?? false)
+                        ? _hotline!
+                        : 'Chưa cài số',
+                    icon: Icons.car_repair_rounded,
+                    color: Colors.orange,
+                    onTap: _callHotline,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
                 Expanded(
                   child: _buildSosButton(
                     title: 'CSGT',
@@ -340,7 +416,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     title: 'Cứu hỏa',
                     subtitle: '114',
                     icon: Icons.fire_truck_rounded,
-                    color: Colors.redAccent,
+                    color: Colors.deepOrange,
                     onTap: () => _triggerEmergency('Cứu hỏa', '114'),
                   ),
                 ),

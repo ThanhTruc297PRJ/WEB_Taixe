@@ -82,9 +82,10 @@ def delete_driver(driver_id: str) -> bool:
     # "ma" của tài khoản không còn tồn tại vẫn cộng vào tổng điểm toàn đội xe
     # trên trang Báo cáo sự cố. Import trễ để tránh vòng lặp import (incident_
     # service đã import driver_service ở trên).
-    from app.services import incident_service
+    from app.services import driver_report_service, incident_service
 
     incident_service.delete_by_driver(driver_id)
+    driver_report_service.delete_by_driver(driver_id)
     return True
 
 

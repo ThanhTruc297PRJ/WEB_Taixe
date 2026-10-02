@@ -10,6 +10,7 @@ const EMPTY_DATA = {
   maintenance_due: EMPTY_SECTION,
   inspections_due: EMPTY_SECTION,
   recent_incidents: EMPTY_SECTION,
+  driver_reports: EMPTY_SECTION,
   reported_music: EMPTY_SECTION,
   total: 0,
 }

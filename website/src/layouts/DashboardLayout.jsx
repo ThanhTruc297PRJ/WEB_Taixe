@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { App, Button, Layout, Space, Spin } from 'antd'
-import { SoundOutlined, WarningFilled } from '@ant-design/icons'
+import { MessageOutlined, SoundOutlined, WarningFilled } from '@ant-design/icons'
 import { Outlet, useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import Sidebar from './Sidebar'
@@ -93,7 +93,32 @@ function DashboardLayout() {
     [notification, navigate, handleAlertSound],
   )
 
-  const { connected } = useIncidentAlerts(handleAlert)
+  const handleDriverReport = useCallback(
+    (report) => {
+      setNotificationsRefreshSignal((prev) => prev + 1)
+      notification.info({
+        message: `Báo cáo mới từ ${report.driver_name ?? 'tài xế'}`,
+        description: report.note || 'Đính kèm ảnh, không có mô tả',
+        icon: <MessageOutlined style={{ color: '#1677ff' }} />,
+        key: report.report_id ?? undefined,
+        btn: (
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => {
+              notification.destroy(report.report_id ?? undefined)
+              navigate('/driver-reports')
+            }}
+          >
+            Xem
+          </Button>
+        ),
+      })
+    },
+    [notification, navigate],
+  )
+
+  const { connected } = useIncidentAlerts(handleAlert, handleDriverReport)
 
   return (
     <DriversProvider>

@@ -36,9 +36,9 @@ def register_play(track_id: str, _: dict = Depends(get_current_active_driver)):
 def report_track(
     track_id: str,
     payload: TrackReport,
-    _: dict = Depends(get_current_active_driver),
+    user: dict = Depends(get_current_active_driver),
 ):
-    track = music_service.report(track_id, payload.reason)
+    track = music_service.report(track_id, payload.reason, user["uid"])
     if track is None:
         raise HTTPException(status_code=404, detail="Track not found")
     return track
@@ -48,6 +48,12 @@ def report_track(
 @router.get("/tracks")
 def list_tracks():
     return music_service.list_tracks()
+
+
+@router.get("/tracks/{track_id}/reports")
+def get_track_reports(track_id: str):
+    """Danh sách từng lượt báo cáo (tài xế nào, lúc nào, lý do gì) cho 1 bài hát."""
+    return music_service.list_track_reports(track_id)
 
 
 @router.put("/tracks/{track_id}/toggle")

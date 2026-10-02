@@ -1,11 +1,12 @@
 """Tổng hợp các việc cần admin chú ý — phục vụ chuông thông báo trên web admin.
 
-Gom 5 nguồn: tài xế chờ duyệt, bảo trì sắp tới hạn, đăng kiểm sắp tới hạn, sự
-cố an toàn gần đây, bài hát bị báo cáo. Mỗi nguồn trả {count, items} — items
+Gom 6 nguồn: tài xế chờ duyệt, bảo trì sắp tới hạn, đăng kiểm sắp tới hạn, sự
+cố an toàn gần đây, báo cáo từ tài xế, bài hát bị báo cáo. Mỗi nguồn trả {count, items} — items
 giới hạn _ITEM_LIMIT bản ghi để payload nhẹ, count là tổng số thật (hiển thị
 trên badge)."""
 
 from app.services import (
+    driver_report_service,
     driver_service,
     incident_service,
     inspection_service,
@@ -95,6 +96,22 @@ def _recent_incidents() -> dict:
     return {"count": len(recent), "items": items}
 
 
+def _driver_reports() -> dict:
+    new = driver_report_service.list_new()
+    items = []
+    for r in new[:_ITEM_LIMIT]:
+        driver = driver_service.get_driver(r.get("driver_id", ""))
+        items.append(
+            {
+                "id": r["id"],
+                "name": (driver or {}).get("name"),
+                "note": r.get("note"),
+                "created_at": r.get("created_at"),
+            }
+        )
+    return {"count": len(new), "items": items}
+
+
 def _reported_music() -> dict:
     # Sắp theo số lượt báo cáo giảm dần -> bài bị nhiều người báo cáo nhất lên
     # đầu danh sách xem trước (quan trọng hơn bài chỉ 1 người báo cáo nhầm).
@@ -121,6 +138,7 @@ def get_summary() -> dict:
         "maintenance_due": _maintenance_due(),
         "inspections_due": _inspections_due(),
         "recent_incidents": _recent_incidents(),
+        "driver_reports": _driver_reports(),
         "reported_music": _reported_music(),
     }
     sections["total"] = sum(s["count"] for s in sections.values())

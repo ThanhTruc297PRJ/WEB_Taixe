@@ -60,6 +60,51 @@ class _MusicScreenState extends State<MusicScreen>
     });
   }
 
+  Future<void> _confirmReport(MusicViewModel vm, SongModel song) async {
+    final reasonCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Báo cáo bài hát'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '“${song.title}” — ${song.artist}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                hintText: 'Lý do (không bắt buộc)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Gửi báo cáo'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await vm.reportTrack(
+        song,
+        reason: reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim(),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final musicVM = context.watch<MusicViewModel>();
@@ -338,6 +383,24 @@ class _MusicScreenState extends State<MusicScreen>
                       ),
                     ),
 
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Material(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        shape: const CircleBorder(),
+                        child: IconButton(
+                          tooltip: 'Báo cáo bài hát',
+                          icon: const Icon(
+                            FluentIcons.flag_24_regular,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          onPressed: () => _confirmReport(musicVM, song),
+                        ),
+                      ),
+                    ),
+
                     Padding(
                       padding: const EdgeInsets.all(24.0),
                       child: Column(
@@ -498,6 +561,7 @@ class _MusicScreenState extends State<MusicScreen>
               onPressed: () => musicVM.playTrack(song),
             ),
             onTap: () => musicVM.playTrack(song),
+            onLongPress: () => _confirmReport(musicVM, song),
           ),
         );
       },

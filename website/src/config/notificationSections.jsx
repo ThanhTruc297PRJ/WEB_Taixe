@@ -4,6 +4,7 @@ import {
   SafetyCertificateOutlined,
   WarningOutlined,
   CustomerServiceOutlined,
+  MessageOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
@@ -48,6 +49,16 @@ export const NOTIFICATION_SECTIONS = [
     icon: <WarningOutlined />,
     describe: (item) =>
       item.detected_at ? dayjs(item.detected_at).format('HH:mm DD/MM') : '',
+  },
+  {
+    key: 'driver_reports',
+    label: 'Báo cáo từ tài xế',
+    path: '/driver-reports',
+    icon: <MessageOutlined />,
+    describe: (item) => {
+      const when = item.created_at ? dayjs(item.created_at).format('HH:mm DD/MM') : ''
+      return [item.note, when].filter(Boolean).join(' · ')
+    },
   },
   {
     key: 'reported_music',

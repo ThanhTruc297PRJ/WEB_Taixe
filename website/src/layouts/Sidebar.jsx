@@ -27,6 +27,10 @@ function badgeFor({ key, driversTotal, pendingCount, attention, vehicleCount }) 
       return attention.maintenance_due.count > 0 ? { dot: true, color: '#f59e0b' } : null
     case '/inspections':
       return attention.inspections_due.count > 0 ? { dot: true, color: '#f59e0b' } : null
+    case '/driver-reports': {
+      const c = attention.driver_reports.count
+      return c > 0 ? { count: `${c} Mới`, color: '#f59e0b' } : null
+    }
     case '/music':
       return attention.reported_music.count > 0 ? { dot: true, color: '#dc2626' } : null
     default:

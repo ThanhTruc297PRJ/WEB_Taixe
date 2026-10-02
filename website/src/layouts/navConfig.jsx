@@ -8,6 +8,8 @@ import {
   RobotOutlined,
   CustomerServiceOutlined,
   SafetyCertificateOutlined,
+  FileTextOutlined,
+  MessageOutlined,
 } from '@ant-design/icons'
 
 // Nguồn dữ liệu điều hướng duy nhất — Sidebar và Header cùng đọc từ đây.
@@ -18,6 +20,11 @@ export const NAV_SECTIONS = [
       { key: '/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan' },
       { key: '/drivers', icon: <TeamOutlined />, label: 'Quản lý tài xế' },
       { key: '/incidents', icon: <WarningOutlined />, label: 'Sự cố an toàn' },
+      {
+        key: '/driver-reports',
+        icon: <MessageOutlined />,
+        label: 'Báo cáo từ tài xế',
+      },
     ],
   },
   {
@@ -30,6 +37,7 @@ export const NAV_SECTIONS = [
         icon: <SafetyCertificateOutlined />,
         label: 'Đăng kiểm xe',
       },
+      { key: '/costs', icon: <FileTextOutlined />, label: 'Báo cáo chi phí' },
     ],
   },
   {

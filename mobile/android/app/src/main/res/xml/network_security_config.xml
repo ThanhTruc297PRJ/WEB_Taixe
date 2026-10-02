@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <!-- Stream radio VOH chỉ có HTTP (không có bản HTTPS) — mở riêng domain
+         này, mọi kết nối khác vẫn bắt buộc HTTPS. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">stream.voh.com.vn</domain>
+    </domain-config>
+</network-security-config>

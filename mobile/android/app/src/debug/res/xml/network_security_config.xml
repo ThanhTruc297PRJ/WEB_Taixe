@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bản debug ghi đè bản main: cho phép HTTP mọi nơi để gọi backend local
+     (http://10.0.2.2:8000). Khi đã khai báo networkSecurityConfig thì
+     android:usesCleartextTraffic trong debug/AndroidManifest.xml bị bỏ qua,
+     nên phải mở ở đây. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

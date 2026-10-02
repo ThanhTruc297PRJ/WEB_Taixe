@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from firebase_admin import auth as firebase_auth
 from pydantic import BaseModel
 
-from app.core.security import get_current_admin
+from app.core.security import get_current_active_driver, get_current_admin
 from app.services import admin_account_service, app_settings_service
 
 # Đặt tên module là `app_settings` (không phải `settings`) để tránh đụng tên
@@ -13,6 +13,14 @@ router = APIRouter(
     tags=["settings"],
     dependencies=[Depends(get_current_admin)],
 )
+
+# App tài xế chỉ được đọc nhóm "contact", không thấy cấu hình khác.
+self_router = APIRouter(prefix="/settings", tags=["settings (app tài xế)"])
+
+
+@self_router.get("/contact")
+def get_contact(_: dict = Depends(get_current_active_driver)):
+    return app_settings_service.get_settings()["contact"]
 
 
 @router.get("/")

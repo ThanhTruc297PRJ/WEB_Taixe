@@ -62,7 +62,7 @@ class DriverApi {
     String phone,
     String licenseNumber,
   ) async {
-    final j = await _c.put('/drivers/$driverId', {
+    final j = await _c.put('/drivers/$driverId/profile', {
       'name': name,
       'phone': phone,
       'license_number': licenseNumber,
