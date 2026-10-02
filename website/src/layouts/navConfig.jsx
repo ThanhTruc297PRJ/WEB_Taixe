@@ -10,6 +10,7 @@ import {
   SafetyCertificateOutlined,
   FileTextOutlined,
   MessageOutlined,
+  WifiOutlined,
 } from '@ant-design/icons'
 
 // Nguồn dữ liệu điều hướng duy nhất — Sidebar và Header cùng đọc từ đây.
@@ -48,6 +49,7 @@ export const NAV_SECTIONS = [
         icon: <CustomerServiceOutlined />,
         label: 'Quản lý nhạc',
       },
+      { key: '/radio', icon: <WifiOutlined />, label: 'Quản lý radio' },
       { key: '/assistant', icon: <RobotOutlined />, label: 'Trợ lý AI' },
       { key: '/settings', icon: <SettingOutlined />, label: 'Cài đặt' },
     ],

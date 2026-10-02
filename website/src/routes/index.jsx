@@ -15,6 +15,7 @@ const Maintenance = lazy(() => import('../pages/Maintenance'))
 const Inspections = lazy(() => import('../pages/Inspections'))
 const Incidents = lazy(() => import('../pages/Incidents'))
 const Music = lazy(() => import('../pages/Music'))
+const Radio = lazy(() => import('../pages/Radio'))
 const Assistant = lazy(() => import('../pages/Assistant'))
 const Settings = lazy(() => import('../pages/Settings'))
 const CostReport = lazy(() => import('../pages/CostReport'))
@@ -38,6 +39,7 @@ const router = createBrowserRouter([
           { path: 'incidents', element: <Incidents /> },
           { path: 'driver-reports', element: <DriverReports /> },
           { path: 'music', element: <Music /> },
+          { path: 'radio', element: <Radio /> },
           { path: 'assistant', element: <Assistant /> },
           { path: 'settings', element: <Settings /> },
         ],

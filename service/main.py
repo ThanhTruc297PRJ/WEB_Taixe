@@ -26,6 +26,7 @@ from app.routes import (
     kb,
     maintenance,
     music,
+    radio,
     sync,
     trips,
     vehicles,
@@ -135,6 +136,8 @@ app.include_router(assistant.router)
 app.include_router(kb.router)
 app.include_router(music.self_router)
 app.include_router(music.router)
+app.include_router(radio.self_router)
+app.include_router(radio.router)
 app.include_router(websocket.router)
 app.include_router(sync.router)
 app.include_router(driver_reports.self_router)
