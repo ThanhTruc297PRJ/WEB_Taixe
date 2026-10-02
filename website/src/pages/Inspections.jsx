@@ -14,7 +14,11 @@ import {
   Table,
   Tag,
 } from 'antd'
-import { BellOutlined, CheckCircleOutlined, PlusOutlined } from '@ant-design/icons'
+import {
+  BellOutlined,
+  CheckCircleOutlined,
+  PlusOutlined,
+} from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { listVehicles } from '../services/vehicles'
 import { listDrivers } from '../services/drivers'
@@ -28,9 +32,15 @@ import {
   updateInspection,
 } from '../services/inspections'
 import PageHeader from '../components/PageHeader'
+import {
+  FORM_GRID,
+  FULLSCREEN_FORM_STYLE,
+  FULLSCREEN_MODAL,
+} from '../config/fullscreenModal'
 
 const NOTIFY_REASON = {
-  driver_has_no_fcm_token: 'Chưa gán người phụ trách hoặc chưa có thiết bị nhận thông báo',
+  driver_has_no_fcm_token:
+    'Chưa gán người phụ trách hoặc chưa có thiết bị nhận thông báo',
   vehicle_not_found: 'Không tìm thấy xe',
   inspection_not_found: 'Không tìm thấy hồ sơ đăng kiểm',
 }
@@ -64,7 +74,9 @@ function Inspections() {
 
   useEffect(() => {
     getSettings()
-      .then((s) => setReminderDefaultDays(s.inspection_defaults.remind_days_before))
+      .then((s) =>
+        setReminderDefaultDays(s.inspection_defaults.remind_days_before),
+      )
       .catch(() => {
         /* giữ mặc định cứng nếu tải cấu hình lỗi */
       })
@@ -107,7 +119,9 @@ function Inspections() {
 
   const filtered = useMemo(() => {
     const sorted = [...rows].sort(
-      (a, b) => dayjs(a.old_sticker_expiry).valueOf() - dayjs(b.old_sticker_expiry).valueOf(),
+      (a, b) =>
+        dayjs(a.old_sticker_expiry).valueOf() -
+        dayjs(b.old_sticker_expiry).valueOf(),
     )
     if (statusFilter === 'all') return sorted
     if (statusFilter === 'overdue') return sorted.filter(isOverdue)
@@ -129,8 +143,12 @@ function Inspections() {
       vehicle_id: record.vehicle_id,
       driver_id: record.driver_id ?? null,
       station: record.station,
-      appointment_at: record.appointment_at ? dayjs(record.appointment_at) : null,
-      old_sticker_expiry: record.old_sticker_expiry ? dayjs(record.old_sticker_expiry) : null,
+      appointment_at: record.appointment_at
+        ? dayjs(record.appointment_at)
+        : null,
+      old_sticker_expiry: record.old_sticker_expiry
+        ? dayjs(record.old_sticker_expiry)
+        : null,
       remind_days_before: record.remind_days_before ?? 15,
       inspection_fee: record.inspection_fee ?? null,
       road_fee: record.road_fee ?? null,
@@ -148,7 +166,9 @@ function Inspections() {
     }
     const payload = {
       ...values,
-      appointment_at: values.appointment_at ? values.appointment_at.toISOString() : null,
+      appointment_at: values.appointment_at
+        ? values.appointment_at.toISOString()
+        : null,
       old_sticker_expiry: values.old_sticker_expiry.toISOString(),
     }
     setSaving(true)
@@ -186,7 +206,9 @@ function Inspections() {
       if (result.sent) {
         message.success('Đã gửi nhắc đăng kiểm')
       } else {
-        message.warning(NOTIFY_REASON[result.reason] || `Không gửi được: ${result.reason}`)
+        message.warning(
+          NOTIFY_REASON[result.reason] || `Không gửi được: ${result.reason}`,
+        )
       }
     } catch (e) {
       message.error(e.message)
@@ -233,7 +255,11 @@ function Inspections() {
   }
 
   const columns = [
-    { title: 'Xe', dataIndex: 'vehicle_id', render: (id) => vehiclePlate[id] || id },
+    {
+      title: 'Xe',
+      dataIndex: 'vehicle_id',
+      render: (id) => vehiclePlate[id] || id,
+    },
     {
       title: 'Người phụ trách',
       dataIndex: 'driver_id',
@@ -243,7 +269,8 @@ function Inspections() {
     {
       title: 'Khung giờ hẹn',
       dataIndex: 'appointment_at',
-      render: (d) => (d ? dayjs(d).format('DD/MM/YYYY HH:mm') : 'Chưa đặt lịch'),
+      render: (d) =>
+        d ? dayjs(d).format('DD/MM/YYYY HH:mm') : 'Chưa đặt lịch',
     },
     {
       title: 'Tem cũ hết hạn',
@@ -262,7 +289,11 @@ function Inspections() {
       title: 'Kết quả',
       dataIndex: 'result',
       render: (v) =>
-        v ? <Tag color={RESULT_META[v]?.color}>{RESULT_META[v]?.label}</Tag> : '—',
+        v ? (
+          <Tag color={RESULT_META[v]?.color}>{RESULT_META[v]?.label}</Tag>
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Trạng thái',
@@ -359,12 +390,13 @@ function Inspections() {
         onCancel={() => setModalOpen(false)}
         okText="Lưu"
         cancelText="Huỷ"
-        width={600}
-        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 } }}
+        width="100vw"
+        style={FULLSCREEN_MODAL.style}
+        styles={FULLSCREEN_MODAL.styles}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical">
-          <div className="grid grid-cols-2 gap-x-3">
+        <Form form={form} layout="vertical" style={FULLSCREEN_FORM_STYLE}>
+          <div style={FORM_GRID}>
             <Form.Item
               name="vehicle_id"
               label="Xe"
@@ -399,7 +431,7 @@ function Inspections() {
             <Input placeholder="vd: Trạm đăng kiểm 50-03V" />
           </Form.Item>
 
-          <div className="grid grid-cols-2 gap-x-3">
+          <div style={FORM_GRID}>
             <Form.Item
               name="appointment_at"
               label="Khung giờ hẹn"
@@ -418,7 +450,11 @@ function Inspections() {
               rules={[{ required: true, message: 'Chọn ngày hết hạn tem cũ' }]}
               tooltip="Hệ thống tự nhắc trước theo ngày này — không cần tự nhớ đặt lịch sớm"
             >
-              <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
+              <DatePicker
+                format="DD/MM/YYYY"
+                style={{ width: '100%' }}
+                placeholder="Chọn ngày"
+              />
             </Form.Item>
           </div>
 
@@ -430,7 +466,7 @@ function Inspections() {
             <InputNumber min={0} style={{ width: '100%' }} addonAfter="ngày" />
           </Form.Item>
 
-          <div className="grid grid-cols-2 gap-x-3">
+          <div style={FORM_GRID}>
             <Form.Item name="inspection_fee" label="Phí kiểm định">
               <InputNumber min={0} style={{ width: '100%' }} addonAfter="đ" />
             </Form.Item>
@@ -440,7 +476,7 @@ function Inspections() {
           </div>
 
           <Form.Item name="note" label="Ghi chú">
-            <Input.TextArea rows={2} />
+            <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
       </Modal>
@@ -456,7 +492,11 @@ function Inspections() {
         destroyOnHidden
       >
         <Form form={completeForm} layout="vertical">
-          <Form.Item name="result" label="Kết quả đăng kiểm" rules={[{ required: true }]}>
+          <Form.Item
+            name="result"
+            label="Kết quả đăng kiểm"
+            rules={[{ required: true }]}
+          >
             <Radio.Group
               options={[
                 { value: 'passed', label: 'Đạt' },
@@ -480,7 +520,8 @@ function Inspections() {
                 </Form.Item>
               ) : (
                 <p className="text-sm text-slate-500 mb-0">
-                  Xe cần sửa chữa rồi đặt lịch đăng kiểm lại — tạo hồ sơ mới sau khi có lịch hẹn.
+                  Xe cần sửa chữa rồi đặt lịch đăng kiểm lại — tạo hồ sơ mới sau
+                  khi có lịch hẹn.
                 </p>
               )
             }

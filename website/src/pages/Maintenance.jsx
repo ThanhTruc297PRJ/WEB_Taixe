@@ -29,6 +29,11 @@ import {
   updateMaintenance,
 } from '../services/maintenance'
 import PageHeader from '../components/PageHeader'
+import {
+  FORM_GRID,
+  FULLSCREEN_FORM_STYLE,
+  FULLSCREEN_MODAL,
+} from '../config/fullscreenModal'
 
 // "Đăng kiểm" đã tách sang trang riêng (Đăng kiểm xe) — không còn chọn được
 // khi tạo mới, chỉ giữ nhãn cho dữ liệu cũ (xem _TYPE_LABELS phía backend).
@@ -45,7 +50,8 @@ const typeLabel = (value) =>
   (value === 'inspection' ? 'Đăng kiểm (dữ liệu cũ)' : value)
 
 const NOTIFY_REASON = {
-  driver_has_no_fcm_token: 'Xe chưa gán tài xế hoặc tài xế chưa có thiết bị nhận thông báo',
+  driver_has_no_fcm_token:
+    'Xe chưa gán tài xế hoặc tài xế chưa có thiết bị nhận thông báo',
   vehicle_not_found: 'Không tìm thấy xe',
   maintenance_not_found: 'Không tìm thấy lịch bảo trì',
 }
@@ -118,10 +124,12 @@ function Maintenance() {
   }, [drivers])
 
   const filtered = useMemo(() => {
-    let sorted = [...rows].sort((a, b) =>
-      dayjs(a.scheduled_date).valueOf() - dayjs(b.scheduled_date).valueOf(),
+    let sorted = [...rows].sort(
+      (a, b) =>
+        dayjs(a.scheduled_date).valueOf() - dayjs(b.scheduled_date).valueOf(),
     )
-    if (vehicleFilter) sorted = sorted.filter((r) => r.vehicle_id === vehicleFilter)
+    if (vehicleFilter)
+      sorted = sorted.filter((r) => r.vehicle_id === vehicleFilter)
     if (statusFilter === 'all') return sorted
     if (statusFilter === 'overdue') return sorted.filter(isOverdue)
     if (statusFilter === 'pending')
@@ -163,7 +171,9 @@ function Maintenance() {
       driver_id: record.driver_id ?? null,
       vendor: record.vendor ?? '',
       type: record.type,
-      scheduled_date: record.scheduled_date ? dayjs(record.scheduled_date) : null,
+      scheduled_date: record.scheduled_date
+        ? dayjs(record.scheduled_date)
+        : null,
       status: record.status ?? 'pending',
       odometer: record.odometer ?? null,
       interval_km: record.interval_km ?? null,
@@ -222,7 +232,9 @@ function Maintenance() {
       if (result.sent) {
         message.success('Đã gửi nhắc bảo trì tới tài xế')
       } else {
-        message.warning(NOTIFY_REASON[result.reason] || `Không gửi được: ${result.reason}`)
+        message.warning(
+          NOTIFY_REASON[result.reason] || `Không gửi được: ${result.reason}`,
+        )
       }
     } catch (e) {
       message.error(e.message)
@@ -369,10 +381,12 @@ function Maintenance() {
         onCancel={() => setModalOpen(false)}
         okText="Lưu"
         cancelText="Huỷ"
-        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 } }}
+        width="100vw"
+        style={FULLSCREEN_MODAL.style}
+        styles={FULLSCREEN_MODAL.styles}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" style={FULLSCREEN_FORM_STYLE}>
           <Form.Item
             name="vehicle_id"
             label="Xe"
@@ -386,7 +400,7 @@ function Maintenance() {
               }))}
             />
           </Form.Item>
-          <div className="grid grid-cols-2 gap-x-3">
+          <div style={FORM_GRID}>
             <Form.Item
               name="driver_id"
               label="Người phụ trách mang xe đi"
@@ -403,23 +417,29 @@ function Maintenance() {
             </Form.Item>
           </div>
 
-          <Form.Item
-            name="type"
-            label="Hạng mục"
-            rules={[{ required: true, message: 'Chọn hạng mục' }]}
-          >
-            <Select options={TYPE_OPTIONS} />
-          </Form.Item>
-          <Form.Item
-            name="scheduled_date"
-            label="Ngày hẹn"
-            rules={[{ required: true, message: 'Chọn ngày hẹn' }]}
-            tooltip="Hệ thống tự nhắc trước khi tới ngày này (xem 'Báo trước mấy ngày' bên dưới)"
-          >
-            <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
-          </Form.Item>
+          <div style={FORM_GRID}>
+            <Form.Item
+              name="type"
+              label="Hạng mục"
+              rules={[{ required: true, message: 'Chọn hạng mục' }]}
+            >
+              <Select options={TYPE_OPTIONS} />
+            </Form.Item>
+            <Form.Item
+              name="scheduled_date"
+              label="Ngày hẹn"
+              rules={[{ required: true, message: 'Chọn ngày hẹn' }]}
+              tooltip="Hệ thống tự nhắc trước khi tới ngày này (xem 'Báo trước mấy ngày' bên dưới)"
+            >
+              <DatePicker
+                format="DD/MM/YYYY"
+                style={{ width: '100%' }}
+                placeholder="Chọn ngày"
+              />
+            </Form.Item>
+          </div>
 
-          <div className="grid grid-cols-2 gap-x-3">
+          <div style={FORM_GRID}>
             <Form.Item
               name="due_odometer_km"
               label="Hẹn tới km"
@@ -428,14 +448,23 @@ function Maintenance() {
               <InputNumber min={0} style={{ width: '100%' }} addonAfter="km" />
             </Form.Item>
             <Form.Item name="interval_km" label="Chu kỳ bảo trì">
-              <InputNumber min={0} style={{ width: '100%' }} addonAfter="km" placeholder="vd: 5000" />
+              <InputNumber
+                min={0}
+                style={{ width: '100%' }}
+                addonAfter="km"
+                placeholder="vd: 5000"
+              />
             </Form.Item>
             <Form.Item
               name="remind_days_before"
               label="Báo trước mấy ngày"
               rules={[{ required: true }]}
             >
-              <InputNumber min={0} style={{ width: '100%' }} addonAfter="ngày" />
+              <InputNumber
+                min={0}
+                style={{ width: '100%' }}
+                addonAfter="ngày"
+              />
             </Form.Item>
             <Form.Item
               name="remind_km_before"
@@ -461,7 +490,7 @@ function Maintenance() {
             />
           </Form.Item>
           <Form.Item name="note" label="Ghi chú">
-            <Input.TextArea rows={2} />
+            <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
       </Modal>

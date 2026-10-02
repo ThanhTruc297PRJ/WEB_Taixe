@@ -5,6 +5,7 @@ import {
   CarOutlined,
   WarningOutlined,
   ToolOutlined,
+  SafetyCertificateOutlined,
   ArrowRightOutlined,
   RiseOutlined,
 } from '@ant-design/icons'
@@ -24,6 +25,7 @@ const TONES = {
   rose: 'bg-rose-50 text-rose-600',
   slate: 'bg-slate-100 text-slate-600',
   green: 'bg-emerald-50 text-emerald-600',
+  teal: 'bg-teal-50 text-teal-600',
 }
 
 const WEEKS = 8
@@ -362,18 +364,36 @@ function Dashboard() {
     }
   }, [incidents, driverName])
 
+  // Bảo trì và đăng kiểm là 2 việc khác nhau (gara vs trạm đăng kiểm) -> tách 2 ô.
   const maintenanceStats = useMemo(() => {
-    const items = [...attention.maintenance_due.items, ...attention.inspections_due.items]
-    const withDate = items
-      .map((i) => ({ item: i, date: toDate(i.scheduled_date) || toDate(i.old_sticker_expiry) }))
-      .sort((a, b) => (a.date && b.date ? a.date - b.date : 0))
+    const withDate = attention.maintenance_due.items
+      .map((i) => ({ item: i, date: toDate(i.scheduled_date) }))
+      .sort((a, b) => (a.date && b.date ? a.date - b.date : a.date ? -1 : 1))
     const list = withDate.map(({ item, date }) => ({
       key: item.id,
-      primary: vehicleById[item.vehicle_id]?.plate_number || item.vehicle_id,
-      secondary: date ? dayjs(date).format('DD/MM/YYYY') : '',
+      primary: vehicleById[item.vehicle_id]?.plate_number || item.plate_number || item.vehicle_id,
+      secondary: [item.type_label, date ? dayjs(date).format('DD/MM/YYYY') : 'Theo km']
+        .filter(Boolean)
+        .join(' · '),
     }))
     return {
-      count: attention.maintenance_due.count + attention.inspections_due.count,
+      count: attention.maintenance_due.count,
+      nearest: withDate[0]?.date ? dayjs(withDate[0].date).format('DD/MM/YYYY') : null,
+      list,
+    }
+  }, [attention, vehicleById])
+
+  const inspectionStats = useMemo(() => {
+    const withDate = attention.inspections_due.items
+      .map((i) => ({ item: i, date: toDate(i.old_sticker_expiry) }))
+      .sort((a, b) => (a.date && b.date ? a.date - b.date : a.date ? -1 : 1))
+    const list = withDate.map(({ item, date }) => ({
+      key: item.id,
+      primary: vehicleById[item.vehicle_id]?.plate_number || item.plate_number || item.vehicle_id,
+      secondary: date ? `Tem hết hạn ${dayjs(date).format('DD/MM/YYYY')}` : item.station || '',
+    }))
+    return {
+      count: attention.inspections_due.count,
       nearest: withDate[0]?.date ? dayjs(withDate[0].date).format('DD/MM/YYYY') : null,
       list,
     }
@@ -421,7 +441,7 @@ function Dashboard() {
       />
 
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={{ flex: '20%' }}>
           <HeroStatCard
             icon={<TeamOutlined />}
             label="Tài xế trực tuyến"
@@ -437,7 +457,7 @@ function Dashboard() {
             emptyText="Chưa có tài xế nào trực tuyến"
           />
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={{ flex: '20%' }}>
           <HeroStatCard
             icon={<CarOutlined />}
             label="Xe đang lưu thông"
@@ -453,7 +473,7 @@ function Dashboard() {
             emptyText="Chưa có xe nào đang lưu thông"
           />
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={{ flex: '20%' }}>
           <HeroStatCard
             icon={<WarningOutlined />}
             label="Cảnh báo buồn ngủ"
@@ -465,16 +485,38 @@ function Dashboard() {
             emptyText="Chưa có cảnh báo buồn ngủ nào hôm nay"
           />
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={{ flex: '20%' }}>
           <HeroStatCard
             icon={<ToolOutlined />}
-            label="Bảo trì & Đăng kiểm"
-            value={`${maintenanceStats.count} xe sắp đến hạn`}
-            trend={maintenanceStats.nearest ? `Hạn gần nhất: ${maintenanceStats.nearest}` : null}
+            label="Bảo trì"
+            value={`${maintenanceStats.count} lịch sắp đến hạn`}
+            trend={
+              maintenanceStats.nearest
+                ? `Hẹn gần nhất: ${maintenanceStats.nearest}`
+                : maintenanceStats.count
+                  ? 'Đến hạn theo số km'
+                  : 'Không có lịch nào sắp tới'
+            }
             tone="amber"
             onClick={() => navigate('/maintenance')}
             items={maintenanceStats.list}
-            emptyText="Chưa có xe nào sắp tới hạn"
+            emptyText="Chưa có xe nào sắp tới hạn bảo trì"
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={8} xl={{ flex: '20%' }}>
+          <HeroStatCard
+            icon={<SafetyCertificateOutlined />}
+            label="Đăng kiểm"
+            value={`${inspectionStats.count} xe sắp hết hạn`}
+            trend={
+              inspectionStats.nearest
+                ? `Tem hết hạn sớm nhất: ${inspectionStats.nearest}`
+                : 'Không có xe nào sắp hết hạn'
+            }
+            tone="teal"
+            onClick={() => navigate('/inspections')}
+            items={inspectionStats.list}
+            emptyText="Chưa có xe nào sắp hết hạn đăng kiểm"
           />
         </Col>
       </Row>
