@@ -29,6 +29,7 @@ from app.routes import (
     radio,
     sync,
     trips,
+    vehicle_jobs,
     vehicles,
     websocket,
 )
@@ -138,6 +139,8 @@ app.include_router(music.self_router)
 app.include_router(music.router)
 app.include_router(radio.self_router)
 app.include_router(radio.router)
+app.include_router(vehicle_jobs.self_router)
+app.include_router(vehicle_jobs.router)
 app.include_router(websocket.router)
 app.include_router(sync.router)
 app.include_router(driver_reports.self_router)

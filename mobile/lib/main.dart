@@ -12,7 +12,6 @@ import 'services/fcm_service.dart';
 import 'presentation/viewmodels/auth_view_model.dart';
 import 'presentation/viewmodels/monitoring_view_model.dart';
 import 'presentation/viewmodels/music_view_model.dart';
-import 'presentation/viewmodels/maintenance_view_model.dart';
 
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/screens/auth/register_screen.dart';
@@ -34,7 +33,6 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthViewModel()),
         ChangeNotifierProvider(create: (_) => MonitoringViewModel()),
         ChangeNotifierProvider(create: (_) => MusicViewModel()),
-        ChangeNotifierProvider(create: (_) => MaintenanceViewModel()),
       ],
       child: const MyApp(),
     ),

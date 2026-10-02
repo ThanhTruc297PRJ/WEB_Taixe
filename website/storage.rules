@@ -19,6 +19,11 @@ service firebase.storage {
       allow read: if true;
       allow write: if false;
     }
+    // Ảnh hoá đơn / tem tài xế gửi khi báo đã bảo trì, đăng kiểm xong.
+    match /job_proofs/{uid}/{file} {
+      allow read: if true;
+      allow write: if false;
+    }
 
     // Ảnh đại diện admin: chỉ chính chủ (đúng uid + có claim admin) mới ghi
     // được vào thư mục của mình. Đọc công khai — giống cách incident media

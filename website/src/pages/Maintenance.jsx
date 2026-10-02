@@ -12,9 +12,8 @@ import {
   Select,
   Space,
   Table,
-  Tag,
 } from 'antd'
-import { BellOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons'
+import { AuditOutlined, BellOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { listVehicles } from '../services/vehicles'
@@ -29,6 +28,7 @@ import {
   updateMaintenance,
 } from '../services/maintenance'
 import PageHeader from '../components/PageHeader'
+import JobReviewModal, { JobStatusTag } from '../components/JobReviewModal'
 import {
   FORM_GRID,
   FULLSCREEN_FORM_STYLE,
@@ -68,7 +68,9 @@ function Maintenance() {
   const [vehicles, setVehicles] = useState([])
   const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState(
+    () => searchParams.get('status') || 'all',
+  )
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -122,6 +124,17 @@ function Maintenance() {
     for (const d of drivers) map[d.id] = d.name
     return map
   }, [drivers])
+
+  // ?review=<id> mở thẳng màn xác nhận (link từ chuông thông báo).
+  const reviewId = searchParams.get('review')
+  const reviewTarget = reviewId ? rows.find((r) => r.id === reviewId) : null
+  const setReviewId = (id) =>
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (id) next.set('review', id)
+      else next.delete('review')
+      return next
+    })
 
   const filtered = useMemo(() => {
     let sorted = [...rows].sort(
@@ -274,27 +287,36 @@ function Maintenance() {
     {
       title: 'Trạng thái',
       key: 'status',
-      render: (_, record) => {
-        if (record.status === 'done') return <Tag color="green">Đã xong</Tag>
-        if (isOverdue(record)) return <Tag color="red">Quá hạn</Tag>
-        return <Tag color="blue">Chờ tới hạn</Tag>
-      },
+      render: (_, record) => (
+        <JobStatusTag record={record} overdue={isOverdue(record)} />
+      ),
     },
     {
       title: '',
       key: 'actions',
-      width: 240,
+      width: 260,
       render: (_, record) => (
-        <Space>
-          <Button
-            size="small"
-            icon={<BellOutlined />}
-            loading={notifyingId === record.id}
-            disabled={record.status === 'done'}
-            onClick={() => handleNotify(record.id)}
-          >
-            Gửi nhắc
-          </Button>
+        <Space wrap>
+          {record.status === 'awaiting_confirmation' ? (
+            <Button
+              size="small"
+              type="primary"
+              icon={<AuditOutlined />}
+              onClick={() => setReviewId(record.id)}
+            >
+              Xem & xác nhận
+            </Button>
+          ) : (
+            <Button
+              size="small"
+              icon={<BellOutlined />}
+              loading={notifyingId === record.id}
+              disabled={record.status === 'done'}
+              onClick={() => handleNotify(record.id)}
+            >
+              Gửi nhắc
+            </Button>
+          )}
           <Button size="small" onClick={() => openEdit(record)}>
             Sửa
           </Button>
@@ -358,6 +380,7 @@ function Maintenance() {
           style={{ width: 200 }}
           options={[
             { value: 'all', label: 'Tất cả' },
+            { value: 'awaiting_confirmation', label: 'Chờ xác nhận' },
             { value: 'overdue', label: 'Quá hạn' },
             { value: 'pending', label: 'Chờ tới hạn' },
             { value: 'done', label: 'Đã xong' },
@@ -371,6 +394,16 @@ function Maintenance() {
         columns={columns}
         dataSource={filtered}
         pagination={{ pageSize: 10, showSizeChanger: false }}
+      />
+
+      <JobReviewModal
+        kind="maintenance"
+        job={reviewTarget}
+        title={reviewTarget ? typeLabel(reviewTarget.type).toLowerCase() : ''}
+        plate={reviewTarget ? vehiclePlate[reviewTarget.vehicle_id] : ''}
+        driverName={(id) => driverName[id]}
+        onClose={() => setReviewId(null)}
+        onDone={load}
       />
 
       <Modal
@@ -485,6 +518,11 @@ function Maintenance() {
             <Select
               options={[
                 { value: 'pending', label: 'Chờ tới hạn' },
+                {
+                  value: 'awaiting_confirmation',
+                  label: 'Chờ xác nhận (tài xế đã báo xong)',
+                  disabled: true,
+                },
                 { value: 'done', label: 'Đã xong' },
               ]}
             />

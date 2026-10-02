@@ -15,10 +15,12 @@ import {
   Tag,
 } from 'antd'
 import {
+  AuditOutlined,
   BellOutlined,
   CheckCircleOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
+import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { listVehicles } from '../services/vehicles'
 import { listDrivers } from '../services/drivers'
@@ -32,6 +34,7 @@ import {
   updateInspection,
 } from '../services/inspections'
 import PageHeader from '../components/PageHeader'
+import JobReviewModal, { JobStatusTag } from '../components/JobReviewModal'
 import {
   FORM_GRID,
   FULLSCREEN_FORM_STYLE,
@@ -57,6 +60,7 @@ const isOverdue = (record) =>
 
 function Inspections() {
   const { message } = App.useApp()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState([])
   const [vehicles, setVehicles] = useState([])
   const [drivers, setDrivers] = useState([])
@@ -116,6 +120,17 @@ function Inspections() {
     for (const d of drivers) map[d.id] = d.name
     return map
   }, [drivers])
+
+  // ?review=<id> mở thẳng màn xác nhận (link từ chuông thông báo).
+  const reviewId = searchParams.get('review')
+  const reviewTarget = reviewId ? rows.find((r) => r.id === reviewId) : null
+  const setReviewId = (id) =>
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (id) next.set('review', id)
+      else next.delete('review')
+      return next
+    })
 
   const filtered = useMemo(() => {
     const sorted = [...rows].sort(
@@ -298,11 +313,13 @@ function Inspections() {
     {
       title: 'Trạng thái',
       key: 'status',
-      render: (_, record) => {
-        if (record.status === 'done') return <Tag color="green">Đã xong</Tag>
-        if (isOverdue(record)) return <Tag color="red">Quá hạn tem</Tag>
-        return <Tag color="blue">Chờ tới hạn</Tag>
-      },
+      render: (_, record) => (
+        <JobStatusTag
+          record={record}
+          overdue={isOverdue(record)}
+          overdueLabel="Quá hạn tem"
+        />
+      ),
     },
     {
       title: '',
@@ -310,15 +327,26 @@ function Inspections() {
       width: 320,
       render: (_, record) => (
         <Space wrap>
-          <Button
-            size="small"
-            icon={<BellOutlined />}
-            loading={notifyingId === record.id}
-            disabled={record.status === 'done'}
-            onClick={() => handleNotify(record.id)}
-          >
-            Gửi nhắc
-          </Button>
+          {record.status === 'awaiting_confirmation' ? (
+            <Button
+              size="small"
+              type="primary"
+              icon={<AuditOutlined />}
+              onClick={() => setReviewId(record.id)}
+            >
+              Xem & xác nhận
+            </Button>
+          ) : (
+            <Button
+              size="small"
+              icon={<BellOutlined />}
+              loading={notifyingId === record.id}
+              disabled={record.status === 'done'}
+              onClick={() => handleNotify(record.id)}
+            >
+              Gửi nhắc
+            </Button>
+          )}
           {record.status === 'pending' && (
             <Button
               size="small"
@@ -366,6 +394,7 @@ function Inspections() {
           style={{ width: 200 }}
           options={[
             { value: 'all', label: 'Tất cả' },
+            { value: 'awaiting_confirmation', label: 'Chờ xác nhận' },
             { value: 'overdue', label: 'Quá hạn tem' },
             { value: 'pending', label: 'Chờ tới hạn' },
             { value: 'done', label: 'Đã xong' },
@@ -380,6 +409,16 @@ function Inspections() {
         dataSource={filtered}
         pagination={{ pageSize: 10, showSizeChanger: false }}
         scroll={{ x: 1100 }}
+      />
+
+      <JobReviewModal
+        kind="inspection"
+        job={reviewTarget}
+        title="đăng kiểm"
+        plate={reviewTarget ? vehiclePlate[reviewTarget.vehicle_id] : ''}
+        driverName={(id) => driverName[id]}
+        onClose={() => setReviewId(null)}
+        onDone={load}
       />
 
       <Modal

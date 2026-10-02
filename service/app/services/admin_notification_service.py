@@ -12,6 +12,7 @@ from app.services import (
     inspection_service,
     maintenance_service,
     music_service,
+    vehicle_job_service,
     vehicle_service,
 )
 from app.services.maintenance_service import _TYPE_LABELS as _MAINTENANCE_TYPE_LABELS
@@ -112,6 +113,32 @@ def _driver_reports() -> dict:
     return {"count": len(new), "items": items}
 
 
+def _awaiting_confirmation() -> dict:
+    """Bảo trì / đăng kiểm tài xế đã báo xong, chờ admin xác nhận."""
+    awaiting = vehicle_job_service.list_awaiting()
+    items = []
+    for j in awaiting[:_ITEM_LIMIT]:
+        vehicle = vehicle_service.get_vehicle(j.get("vehicle_id", ""))
+        sub = j.get("driver_submission") or {}
+        driver = driver_service.get_driver(sub.get("submitted_by", ""))
+        is_maintenance = j["kind"] == vehicle_job_service.MAINTENANCE
+        items.append(
+            {
+                "id": j["id"],
+                "kind": j["kind"],
+                "plate_number": (vehicle or {}).get("plate_number"),
+                "type_label": (
+                    _MAINTENANCE_TYPE_LABELS.get(j.get("type"), j.get("type"))
+                    if is_maintenance
+                    else "Đăng kiểm"
+                ),
+                "driver_name": (driver or {}).get("name"),
+                "submitted_at": sub.get("submitted_at"),
+            }
+        )
+    return {"count": len(awaiting), "items": items}
+
+
 def _reported_music() -> dict:
     # Sắp theo số lượt báo cáo giảm dần -> bài bị nhiều người báo cáo nhất lên
     # đầu danh sách xem trước (quan trọng hơn bài chỉ 1 người báo cáo nhầm).
@@ -139,6 +166,7 @@ def get_summary() -> dict:
         "inspections_due": _inspections_due(),
         "recent_incidents": _recent_incidents(),
         "driver_reports": _driver_reports(),
+        "awaiting_confirmation": _awaiting_confirmation(),
         "reported_music": _reported_music(),
     }
     sections["total"] = sum(s["count"] for s in sections.values())

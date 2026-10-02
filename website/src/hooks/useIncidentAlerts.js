@@ -9,17 +9,20 @@ const RECONNECT_MIN_MS = 3_000
 const RECONNECT_MAX_MS = 30_000
 
 /** Kết nối WebSocket tới service, gọi `onAlert(payload)` mỗi khi có tài xế
- * vượt ngưỡng buồn ngủ, `onDriverReport(payload)` khi tài xế tự gửi báo cáo.
+ * vượt ngưỡng buồn ngủ, `onDriverReport(payload)` khi tài xế tự gửi báo cáo,
+ * `onJobSubmitted(payload)` khi tài xế báo đã bảo trì / đăng kiểm xong.
  * Tự ping giữ kết nối + tự kết nối lại (backoff) khi rớt. */
-export function useIncidentAlerts(onAlert, onDriverReport) {
+export function useIncidentAlerts(onAlert, onDriverReport, onJobSubmitted) {
   const [connected, setConnected] = useState(false)
   const cbRef = useRef(onAlert)
   const reportCbRef = useRef(onDriverReport)
+  const jobCbRef = useRef(onJobSubmitted)
 
   useEffect(() => {
     cbRef.current = onAlert
     reportCbRef.current = onDriverReport
-  }, [onAlert, onDriverReport])
+    jobCbRef.current = onJobSubmitted
+  }, [onAlert, onDriverReport, onJobSubmitted])
 
   useEffect(() => {
     let ws = null
@@ -84,6 +87,7 @@ export function useIncidentAlerts(onAlert, onDriverReport) {
         }
         if (msg.type === 'alert') cbRef.current?.(msg)
         else if (msg.type === 'driver_report') reportCbRef.current?.(msg)
+        else if (msg.type === 'job_submitted') jobCbRef.current?.(msg)
       }
 
       ws.onclose = () => {

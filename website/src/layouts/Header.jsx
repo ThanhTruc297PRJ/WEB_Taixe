@@ -125,6 +125,7 @@ const styles = {
 const URGENCY = [
   'recent_incidents',
   'driver_reports',
+  'awaiting_confirmation',
   'pending_drivers',
   'maintenance_due',
   'inspections_due',
@@ -222,7 +223,7 @@ function NotificationPanel({ data, error, newIds, onNavigate }) {
                     section={s}
                     item={item}
                     isNew={newIds.has(item.id)}
-                    onClick={() => onNavigate(s.path)}
+                    onClick={() => onNavigate(s.itemPath ? s.itemPath(item) : s.path)}
                   />
                 ))}
               </div>

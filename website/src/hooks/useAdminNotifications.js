@@ -11,6 +11,7 @@ const EMPTY_DATA = {
   inspections_due: EMPTY_SECTION,
   recent_incidents: EMPTY_SECTION,
   driver_reports: EMPTY_SECTION,
+  awaiting_confirmation: EMPTY_SECTION,
   reported_music: EMPTY_SECTION,
   total: 0,
 }

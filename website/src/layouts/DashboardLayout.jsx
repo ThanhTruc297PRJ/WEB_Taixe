@@ -1,6 +1,11 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { App, Button, Layout, Space, Spin } from 'antd'
-import { MessageOutlined, SoundOutlined, WarningFilled } from '@ant-design/icons'
+import {
+  AuditOutlined,
+  MessageOutlined,
+  SoundOutlined,
+  WarningFilled,
+} from '@ant-design/icons'
 import { Outlet, useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import Sidebar from './Sidebar'
@@ -118,7 +123,38 @@ function DashboardLayout() {
     [notification, navigate],
   )
 
-  const { connected } = useIncidentAlerts(handleAlert, handleDriverReport)
+  const handleJobSubmitted = useCallback(
+    (job) => {
+      setNotificationsRefreshSignal((prev) => prev + 1)
+      const page = job.kind === 'inspection' ? '/inspections' : '/maintenance'
+      const key = `job-${job.job_id}`
+      notification.info({
+        message: `${job.driver_name ?? 'Tài xế'} báo đã xong ${(job.title ?? '').toLowerCase()}`,
+        description: `Xe ${job.plate_number ?? ''} — cần xem ảnh và xác nhận`,
+        icon: <AuditOutlined style={{ color: '#9333ea' }} />,
+        key,
+        btn: (
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => {
+              notification.destroy(key)
+              navigate(`${page}?review=${job.job_id}`)
+            }}
+          >
+            Xem & xác nhận
+          </Button>
+        ),
+      })
+    },
+    [notification, navigate],
+  )
+
+  const { connected } = useIncidentAlerts(
+    handleAlert,
+    handleDriverReport,
+    handleJobSubmitted,
+  )
 
   return (
     <DriversProvider>

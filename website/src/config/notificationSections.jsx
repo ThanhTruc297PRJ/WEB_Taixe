@@ -5,6 +5,7 @@ import {
   WarningOutlined,
   CustomerServiceOutlined,
   MessageOutlined,
+  AuditOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
@@ -68,6 +69,20 @@ export const NOTIFICATION_SECTIONS = [
     describe: (item) => {
       const when = item.created_at ? dayjs(item.created_at).format('HH:mm DD/MM') : ''
       return [item.note, when].filter(Boolean).join(' · ')
+    },
+  },
+  {
+    key: 'awaiting_confirmation',
+    color: '#9333ea',
+    bg: '#faf5ff',
+    label: 'Chờ xác nhận bảo trì / đăng kiểm',
+    path: '/maintenance?status=awaiting_confirmation',
+    itemPath: (item) =>
+      `${item.kind === 'inspection' ? '/inspections' : '/maintenance'}?review=${item.id}`,
+    icon: <AuditOutlined />,
+    describe: (item) => {
+      const when = item.submitted_at ? dayjs(item.submitted_at).format('HH:mm DD/MM') : ''
+      return [item.type_label, item.driver_name, when].filter(Boolean).join(' · ')
     },
   },
   {
