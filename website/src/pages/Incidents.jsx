@@ -47,12 +47,24 @@ function MilestoneBar({ points, thresholds }) {
     { at: thresholds.warning, label: 'Cảnh cáo', color: '#fa8c16' },
     { at: thresholds.suspend, label: 'Đình chỉ', color: '#f5222d' },
   ]
-  const scale = points > thresholds.suspend ? points + 5 : 35
-  const pct = (v) => `${(v / scale) * 100}%`
+  // Thang chia đều theo mốc (0 → Nhắc nhở → Cảnh cáo → Đình chỉ → cuối thang,
+  // mỗi đoạn 25% bề ngang) thay vì tỉ lệ theo điểm: điểm cao (VD 200) không
+  // còn dồn 3 mốc về sát mép trái, và nhãn các mốc không bao giờ đè nhau.
+  const end = Math.max(points, thresholds.suspend + (thresholds.suspend - thresholds.warning))
+  const anchors = [0, thresholds.reminder, thresholds.warning, thresholds.suspend, end]
+  const toPercent = (v) => {
+    for (let i = 1; i < anchors.length; i += 1) {
+      if (v <= anchors[i]) {
+        const span = anchors[i] - anchors[i - 1] || 1
+        return ((i - 1 + (v - anchors[i - 1]) / span) / (anchors.length - 1)) * 100
+      }
+    }
+    return 100
+  }
   const level = currentLevel(points, thresholds)
 
   return (
-    <div className="mb-12">
+    <div className="mb-10">
       <div className="flex items-baseline gap-3 mb-1">
         <span className="text-sm text-gray-500">Tổng điểm vi phạm</span>
         <span className="text-2xl font-semibold text-gray-800">{points}</span>
@@ -61,27 +73,16 @@ function MilestoneBar({ points, thresholds }) {
       <div className="relative h-2.5 rounded-full bg-gray-100 mt-8">
         <div
           className="absolute h-2.5 rounded-full bg-blue-400"
-          style={{ width: pct(Math.min(points, scale)) }}
+          style={{ width: `${toPercent(points)}%` }}
         />
-        {milestones.map((m, i) => {
-          // So le hàng trên/dưới cho nhãn liền kề — 2 mốc gần nhau (vd 22 và
-          // 30) dễ bị chữ đè lên nhau nếu cùng 1 hàng.
-          const staggered = i % 2 === 1
-          return (
-            <div key={m.at} className="absolute -top-2" style={{ left: pct(m.at) }}>
-              <div
-                className="w-0.5"
-                style={{ background: m.color, height: staggered ? '2.25rem' : '1.5rem' }}
-              />
-              <div
-                className="absolute -translate-x-1/2 whitespace-nowrap text-xs text-gray-500"
-                style={{ top: staggered ? '2.5rem' : '1.75rem' }}
-              >
-                {m.at} · {m.label}
-              </div>
+        {milestones.map((m) => (
+          <div key={m.at} className="absolute -top-2" style={{ left: `${toPercent(m.at)}%` }}>
+            <div className="h-6 w-0.5" style={{ background: m.color }} />
+            <div className="absolute top-7 -translate-x-1/2 whitespace-nowrap text-xs text-gray-500">
+              {m.at} · {m.label}
             </div>
-          )
-        })}
+          </div>
+        ))}
       </div>
     </div>
   )
