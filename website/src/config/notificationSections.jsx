@@ -8,12 +8,14 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
-// Nguồn cấu hình DUY NHẤT cho 5 loại "việc cần chú ý" — dùng chung bởi chuông
+// Nguồn cấu hình DUY NHẤT cho các loại "việc cần chú ý" — dùng chung bởi chuông
 // thông báo (Header) và trang Tổng quan (Dashboard), tránh lặp code/định
 // nghĩa lệch nhau giữa 2 nơi hiển thị cùng 1 dữ liệu từ GET /admin/notifications/.
 export const NOTIFICATION_SECTIONS = [
   {
     key: 'pending_drivers',
+    color: '#2563eb',
+    bg: '#eff6ff',
     label: 'Tài xế chờ duyệt',
     path: '/drivers',
     icon: <TeamOutlined />,
@@ -22,6 +24,8 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'maintenance_due',
+    color: '#d97706',
+    bg: '#fffbeb',
     label: 'Bảo trì sắp tới hạn',
     path: '/maintenance',
     icon: <ToolOutlined />,
@@ -34,6 +38,8 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'inspections_due',
+    color: '#0d9488',
+    bg: '#f0fdfa',
     label: 'Đăng kiểm sắp tới hạn',
     path: '/inspections',
     icon: <SafetyCertificateOutlined />,
@@ -44,6 +50,8 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'recent_incidents',
+    color: '#dc2626',
+    bg: '#fef2f2',
     label: 'Sự cố an toàn gần đây',
     path: '/incidents',
     icon: <WarningOutlined />,
@@ -52,6 +60,8 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'driver_reports',
+    color: '#7c3aed',
+    bg: '#f5f3ff',
     label: 'Báo cáo từ tài xế',
     path: '/driver-reports',
     icon: <MessageOutlined />,
@@ -62,6 +72,8 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'reported_music',
+    color: '#db2777',
+    bg: '#fdf2f8',
     label: 'Bài hát bị báo cáo',
     path: '/music',
     icon: <CustomerServiceOutlined />,

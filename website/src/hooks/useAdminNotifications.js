@@ -107,5 +107,5 @@ export function useAdminNotifications(refreshSignal) {
     currentIds.some((id) => !seenIdSet.has(id)) || data.total > seen.total
   const unseenCount = hasNewSinceSeen ? data.total : 0
 
-  return { data, error, refresh, unseenCount, markSeen }
+  return { data, error, refresh, unseenCount, markSeen, seenIds: seen.ids }
 }
