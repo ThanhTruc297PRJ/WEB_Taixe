@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/event_log.dart';
+import '../../services/ml/fatigue_scorer.dart';
 import '../viewmodels/monitoring_view_model.dart';
 
 class MonitoringScreen extends StatefulWidget {
@@ -136,9 +137,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                 const SizedBox(height: 16),
 
                 // NÚT TẮT CHUÔNG ĐỘC LẬP
-                if (vm.isMonitoring &&
-                    vm.lastDrowsyProbability != null &&
-                    vm.lastDrowsyProbability! >= vm.drowsyThreshold) ...[
+                if (vm.isMonitoring && vm.alarmRinging) ...[
                   Container(
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
@@ -327,19 +326,66 @@ class _StatusCard extends StatelessWidget {
       );
     }
 
-    final (icon, color, bgColor, label) = switch (vm.phase) {
-      MonitoringPhase.idle => (
+    if (vm.phase == MonitoringPhase.idle) {
+      return _box(
         Icons.hourglass_empty,
         Colors.grey.shade600,
         Colors.grey.shade100,
         'Chưa giám sát',
+      );
+    }
+    if (vm.lastDrowsyProbability == null) {
+      return _box(
+        Icons.analytics,
+        const Color(0xFF2A8B88),
+        const Color(0xFF2A8B88).withValues(alpha: 0.1),
+        'AI đang phân tích...',
+      );
+    }
+
+    final score = vm.fatigueScore;
+    final (icon, color, bgColor, label) = switch (vm.fatigueLevel) {
+      FatigueLevel.alarm => (
+        Icons.warning_amber_rounded,
+        Colors.red,
+        Colors.red.shade50,
+        'BÁO ĐỘNG: dấu hiệu ngủ gật!',
       ),
-      MonitoringPhase.monitoring => _monitoringStatus(
-        vm.lastDrowsyProbability,
-        vm.drowsyThreshold,
+      FatigueLevel.reminder => (
+        Icons.coffee_rounded,
+        Colors.orange.shade800,
+        Colors.orange.shade50,
+        'Bạn có dấu hiệu mệt — nên tìm chỗ dừng nghỉ',
+      ),
+      FatigueLevel.normal => (
+        Icons.check_circle_rounded,
+        Colors.green.shade700,
+        Colors.green.shade50,
+        'Trạng thái tỉnh táo',
       ),
     };
 
+    return _box(
+      icon,
+      color,
+      bgColor,
+      label,
+      footer: _FatigueGauge(
+        score: score,
+        reminderAt: vm.fatigueReminderScore,
+        alarmAt: vm.fatigueAlarmScore,
+        color: color,
+      ),
+    );
+  }
+
+  Widget _box(
+    IconData icon,
+    Color color,
+    Color bgColor,
+    String label, {
+    Widget? footer,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -347,51 +393,106 @@ class _StatusCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+          Row(
+            children: [
+              Icon(icon, color: color, size: 28),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
+          if (footer != null) ...[const SizedBox(height: 12), footer],
         ],
       ),
     );
   }
+}
 
-  (IconData, Color, Color, String) _monitoringStatus(
-    double? probability,
-    double threshold,
-  ) {
-    if (probability == null) {
-      return (
-        Icons.analytics,
-        const Color(0xFF2A8B88),
-        const Color(0xFF2A8B88).withValues(alpha: 0.1),
-        'AI đang phân tích...',
-      );
-    }
-    final percent = (probability * 100).toStringAsFixed(0);
-    if (probability >= threshold) {
-      return (
-        Icons.warning_amber_rounded,
-        Colors.red,
-        Colors.red.shade50,
-        'Cảnh báo: BUỒN NGỦ! ($percent%)',
-      );
-    }
-    return (
-      Icons.check_circle_rounded,
-      Colors.green,
-      Colors.green.shade50,
-      'Trạng thái tỉnh táo ($percent%)',
+/// Thanh điểm mệt mỏi 0–100 với 2 vạch: nhắc nhẹ và báo động.
+class _FatigueGauge extends StatelessWidget {
+  const _FatigueGauge({
+    required this.score,
+    required this.reminderAt,
+    required this.alarmAt,
+    required this.color,
+  });
+
+  final double score;
+  final double reminderAt;
+  final double alarmAt;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    const max = 100.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Điểm mệt mỏi',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+            const Spacer(),
+            Text(
+              '${score.toStringAsFixed(0)} / 100',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth;
+            return SizedBox(
+              height: 12,
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: w * (score / max).clamp(0.0, 1.0),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  for (final mark in [reminderAt, alarmAt])
+                    Positioned(
+                      left: w * (mark / max) - 1,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(width: 2, color: Colors.black26),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Nhắc nhẹ từ ${reminderAt.toStringAsFixed(0)} · báo động từ ${alarmAt.toStringAsFixed(0)}. '
+          'Chớp mắt bình thường không tính điểm.',
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+        ),
+      ],
     );
   }
 }

@@ -10,6 +10,7 @@ import '../../data/repositories/event_log_repository.dart';
 import '../../services/alert_service.dart';
 import '../../services/camera/camera_frame_buffer.dart';
 import '../../services/incident_api.dart';
+import '../../services/ml/fatigue_scorer.dart';
 import '../../services/ml/feature_window_aggregator.dart';
 import '../../services/ml/landmark_feature_service.dart';
 import '../../services/ml/tflite_model_service.dart';
@@ -58,8 +59,19 @@ class MonitoringViewModel extends ChangeNotifier {
   double? _smoothedProb;
   int _framesSinceFace = 0;
 
-  // Biến cờ kiểm soát trạng thái tắt chuông chủ động
-  bool _isAlarmMuted = false;
+  /// Cộng dồn điểm mệt mỏi theo sự kiện — quyết định khi nào nhắc / báo động.
+  final FatigueScorer _fatigueScorer = FatigueScorer();
+  double fatigueScore = 0;
+  FatigueLevel get fatigueLevel =>
+      _alarmRinging ? FatigueLevel.alarm : _fatigueScorer.level;
+  double get fatigueReminderScore => _fatigueScorer.config.reminderScore;
+  double get fatigueAlarmScore => _fatigueScorer.config.alarmScore;
+
+  /// Chuông báo động đang kêu: tắt khi tài xế bấm tắt, hoặc mở mắt tỉnh táo
+  /// liên tục [_alarmStopAfterAlert].
+  bool _alarmRinging = false;
+  bool get alarmRinging => _alarmRinging;
+  static const _alarmStopAfterAlert = Duration(seconds: 5);
 
   MonitoringPhase phase = MonitoringPhase.idle;
   double? lastDrowsyProbability;
@@ -111,7 +123,15 @@ class MonitoringViewModel extends ChangeNotifier {
     _framesSinceFace = 0;
     _lastIncidentAt = null;
     lastDrowsyProbability = null;
-    _isAlarmMuted = false; // Đặt lại cờ khi bắt đầu
+    final meta = _tfliteModelService.meta;
+    _fatigueScorer
+      ..config = FatigueConfig.fromJson(
+        meta?.fatigue,
+        earClosed: meta?.earBlinkThreshold,
+      )
+      ..reset();
+    fatigueScore = 0;
+    _alarmRinging = false;
     phase = MonitoringPhase.monitoring;
 
     try {
@@ -137,13 +157,15 @@ class MonitoringViewModel extends ChangeNotifier {
     phase = MonitoringPhase.idle;
     lastDrowsyProbability = null;
     _smoothedProb = null;
-    _isAlarmMuted = false;
+    _fatigueScorer.reset();
+    fatigueScore = 0;
+    _alarmRinging = false;
     notifyListeners();
   }
 
   // Hàm được gọi khi bấm nút "Tắt chuông cảnh báo"
   void stopAlarm() {
-    _isAlarmMuted = true;
+    _alarmRinging = false;
     _alertService.stopAlert();
     notifyListeners();
   }
@@ -189,6 +211,9 @@ class MonitoringViewModel extends ChangeNotifier {
       if (_framesSinceFace > gapReset) {
         _smoothedProb = null;
         _featureWindowAggregator.reset();
+        // Mất mặt ngắn (gục đầu, quay gương) vẫn giữ lần nhắm mắt đang đếm —
+        // gục đầu khi đang nhắm mắt chính là dấu hiệu ngủ gật.
+        _fatigueScorer.faceLost();
       }
       _sendStatus('Không phát hiện khuôn mặt');
       return;
@@ -211,41 +236,87 @@ class MonitoringViewModel extends ChangeNotifier {
     lastDrowsyProbability = probability;
     notifyListeners();
 
+    // Model KHÔNG còn trực tiếp bật chuông: chỉ là 1 nguồn góp điểm mệt mỏi.
+    // Chuông chỉ kêu khi điểm cộng dồn đủ ngưỡng, hoặc nhắm mắt liền quá lâu.
     final threshold = _tfliteModelService.meta?.threshold ?? 0.5;
-    final isDrowsy = probability >= threshold;
-
-    _sendStatus(
-      isDrowsy
-          ? 'Cảnh báo: dấu hiệu buồn ngủ! (${(probability * 100).toStringAsFixed(0)}%)'
-          : 'Trạng thái: bình thường (${(probability * 100).toStringAsFixed(0)}%)',
+    final update = _fatigueScorer.update(
+      now: now,
+      ear: signal.ear,
+      mar: signal.mar,
+      tilt: signal.tilt,
+      modelProbability: probability,
+      modelThreshold: threshold,
     );
+    fatigueScore = update.score;
 
-    if (isDrowsy) {
-      // Chỉ phát chuông nếu người dùng chưa bấm tắt
-      if (!_isAlarmMuted) {
-        _alertService.playWarningAlert();
-      }
+    for (final event in update.events) {
+      await _log(
+        '${event.label} (${(event.duration.inMilliseconds / 1000).toStringAsFixed(1)} giây) · +${event.points.toStringAsFixed(0)} điểm',
+        now,
+        probability,
+      );
+    }
 
-      final log = await _eventLogRepository.insert(
-        EventLog(
-          type: EventType.drowsiness,
-          message: 'Model phát hiện dấu hiệu buồn ngủ',
-          timestamp: now,
-          confidence: probability,
+    if (update.enteredAlarm) {
+      final summary = _fatigueScorer.summary();
+      final reason = update.immediate
+          ? 'Nhắm mắt liên tục quá lâu'
+          : 'Điểm mệt mỏi ${update.score.toStringAsFixed(0)}/100';
+      _alarmRinging = true;
+      _alertService.playWarningAlert();
+      await _log('BÁO ĐỘNG: $reason', now, probability);
+      // Hạ điểm ngay để không báo liên tục; chuông vẫn kêu tới khi tài xế
+      // tỉnh táo trở lại hoặc bấm tắt.
+      _fatigueScorer.acknowledgeAlarm();
+      fatigueScore = _fatigueScorer.score;
+      unawaited(
+        _maybeCaptureIncident(
+          probability,
+          now,
+          note: [reason, if (summary.isNotEmpty) summary].join(' — '),
         ),
       );
-      recentLogs = [log, ...recentLogs].take(50).toList();
-      notifyListeners();
-
-      unawaited(_maybeCaptureIncident(probability, now));
-    } else {
-      // Đặt lại cờ và tắt chuông khi người dùng đã tỉnh táo trở lại
-      _isAlarmMuted = false;
-      _alertService.stopAlert();
+    } else if (update.enteredReminder) {
+      _alertService.playReminder();
+      await _log('Nhắc nhẹ: bạn có dấu hiệu mệt mỏi', now, probability);
     }
+
+    if (_alarmRinging) {
+      final openFor = _fatigueScorer.eyesOpenFor(now);
+      if (openFor != null && openFor >= _alarmStopAfterAlert) {
+        _alarmRinging = false;
+        _alertService.stopAlert();
+      }
+    }
+
+    _sendStatus(switch (fatigueLevel) {
+      FatigueLevel.alarm => 'BÁO ĐỘNG: dấu hiệu ngủ gật!',
+      FatigueLevel.reminder =>
+        'Có dấu hiệu mệt mỏi (${fatigueScore.toStringAsFixed(0)}/100) — nên dừng nghỉ',
+      FatigueLevel.normal =>
+        'Tỉnh táo · điểm mệt mỏi ${fatigueScore.toStringAsFixed(0)}/100',
+    });
+    notifyListeners();
   }
 
-  Future<void> _maybeCaptureIncident(double confidence, DateTime at) async {
+  /// Chỉ ghi log khi có SỰ KIỆN (nhắm lâu, ngáp, báo động...), không ghi mỗi khung.
+  Future<void> _log(String message, DateTime at, double confidence) async {
+    final log = await _eventLogRepository.insert(
+      EventLog(
+        type: EventType.drowsiness,
+        message: message,
+        timestamp: at,
+        confidence: confidence,
+      ),
+    );
+    recentLogs = [log, ...recentLogs].take(50).toList();
+  }
+
+  Future<void> _maybeCaptureIncident(
+    double confidence,
+    DateTime at, {
+    String? note,
+  }) async {
     if (_capturingIncident) return;
     if (_lastIncidentAt != null &&
         at.difference(_lastIncidentAt!) < _incidentCooldown) {
@@ -273,6 +344,7 @@ class MonitoringViewModel extends ChangeNotifier {
           clip: File(clipPath),
           detectedAt: at,
           confidence: confidence,
+          note: note,
         );
       } catch (_) {}
     }

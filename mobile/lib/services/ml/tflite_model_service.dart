@@ -14,6 +14,7 @@ class DrowsinessModelMeta {
     required this.emaBeta,
     required this.emaGapReset,
     required this.featureCols,
+    this.fatigue,
   });
 
   /// Ngưỡng quyết định trên xác suất (đã EMA): >= threshold -> buồn ngủ.
@@ -36,6 +37,9 @@ class DrowsinessModelMeta {
 
   final List<String> featureCols;
 
+  /// Tham số chấm điểm mệt mỏi (xem FatigueConfig.fromJson). Có thể thiếu.
+  final Map<String, dynamic>? fatigue;
+
   factory DrowsinessModelMeta.fromJson(Map<String, dynamic> json) =>
       DrowsinessModelMeta(
         threshold: (json['threshold'] as num).toDouble(),
@@ -45,6 +49,7 @@ class DrowsinessModelMeta {
         emaBeta: (json['ema_beta'] as num).toDouble(),
         emaGapReset: (json['ema_gap_reset'] as num).toInt(),
         featureCols: List<String>.from(json['feature_cols'] as List),
+        fatigue: json['fatigue'] as Map<String, dynamic>?,
       );
 }
 

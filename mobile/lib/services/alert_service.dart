@@ -1,4 +1,5 @@
 import 'package:audioplayers/audioplayers.dart';
+import 'package:vibration/vibration.dart';
 
 class AlertService {
   static final AlertService _instance = AlertService._internal();
@@ -28,6 +29,22 @@ class AlertService {
     } catch (e) {
       _isPlaying = false;
     }
+  }
+
+  /// Mức nhắc nhẹ: rung 2 nhịp + chuông 1 lần (không lặp), không làm phiền
+  /// như báo động.
+  Future<void> playReminder() async {
+    try {
+      if (await Vibration.hasVibrator()) {
+        Vibration.vibrate(pattern: [0, 300, 150, 300]);
+      }
+    } catch (_) {}
+    if (_isPlaying) return; // đang báo động thì thôi
+    try {
+      await _audioPlayer.stop();
+      await _audioPlayer.setReleaseMode(ReleaseMode.stop);
+      await _audioPlayer.play(AssetSource('audio/alarm.mp3'), volume: 0.6);
+    } catch (_) {}
   }
 
   Future<void> playQuickBeep() async {

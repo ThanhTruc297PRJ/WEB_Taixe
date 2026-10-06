@@ -9,12 +9,13 @@ import 'auth_service.dart';
 /// clip lên Firebase Storage rồi tạo document — app KHÔNG ghi thẳng Storage.
 class IncidentApi {
   IncidentApi({String? baseUrl, AuthService? auth})
-      : baseUrl = baseUrl ??
-            const String.fromEnvironment(
-              'API_BASE_URL',
-              defaultValue: 'http://10.0.2.2:8000',
-            ),
-        _auth = auth ?? AuthService();
+    : baseUrl =
+          baseUrl ??
+          const String.fromEnvironment(
+            'API_BASE_URL',
+            defaultValue: 'http://10.0.2.2:8000',
+          ),
+      _auth = auth ?? AuthService();
 
   final String baseUrl;
   final AuthService _auth;
@@ -24,6 +25,7 @@ class IncidentApi {
     required DateTime detectedAt,
     double? confidence,
     String type = 'drowsiness',
+    String? note,
   }) async {
     final token = await _auth.idToken();
     final req =
@@ -41,6 +43,7 @@ class IncidentApi {
     if (confidence != null) {
       req.fields['confidence'] = confidence.toStringAsFixed(4);
     }
+    if (note != null && note.isNotEmpty) req.fields['note'] = note;
 
     final res = await http.Response.fromStream(await req.send());
     if (res.statusCode < 200 || res.statusCode >= 300) {

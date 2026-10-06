@@ -173,6 +173,7 @@ def report_from_driver(
     confidence: Optional[float],
     clip_bytes: bytes,
     content_type: Optional[str],
+    note: Optional[str] = None,
 ) -> dict:
     """App tài xế: model phát hiện buồn ngủ -> quay 10s -> gửi lên đây.
     driver_id lấy từ token, không tin client."""
@@ -200,6 +201,7 @@ def report_from_driver(
             confidence=confidence,
             clip_url=clip_url,
             snapshot_url=snapshot_url,
+            note=note,
         )
     )
 

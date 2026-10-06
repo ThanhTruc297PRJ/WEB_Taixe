@@ -30,5 +30,26 @@
     "perclos_true",
     "blink_rate",
     "head_tilt_roll_std"
-  ]
+  ],
+  "fatigue": {
+    "_note": "Diem met moi cong don tren dien thoai (lib/services/ml/fatigue_scorer.dart). Gia tri khoi dau, chinh sau khi chay thu thuc te.",
+    "blink_max_ms": 400,
+    "long_closure_min_ms": 500,
+    "microsleep_min_ms": 1500,
+    "immediate_alarm_closure_ms": 2000,
+    "long_closure_points": 10,
+    "microsleep_points": 25,
+    "yawn_mar": 0.6,
+    "yawn_min_ms": 1000,
+    "yawn_points": 5,
+    "head_drop_degrees": 20,
+    "head_drop_min_ms": 1500,
+    "head_drop_points": 5,
+    "model_points_per_second": 2,
+    "decay_per_second": 0.2,
+    "reminder_score": 30,
+    "alarm_score": 60,
+    "max_score": 100,
+    "score_after_alarm": 30
+  }
 }
