@@ -12,6 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import PageHeader from '../components/PageHeader'
+import OverviewCharts from '../components/OverviewCharts'
 import { useDrivers } from '../contexts/useDrivers'
 import { useAdminNotifications } from '../hooks/useAdminNotifications'
 import { NOTIFICATION_SECTIONS } from '../config/notificationSections'
@@ -28,7 +29,6 @@ const TONES = {
   teal: 'bg-teal-50 text-teal-600',
 }
 
-const WEEKS = 8
 const PRESENCE_STALE_MS = 120_000
 const SPEED_STALE_MS = 30_000
 
@@ -165,90 +165,6 @@ function AttentionSection({ data, navigate }) {
 
 // Đường cong mượt qua các điểm bằng bezier bậc 2 nối tiếp (M..Q..T) — không
 // cần thư viện chart, đủ đẹp cho biểu đồ nhỏ trên dashboard.
-function smoothPaths(points, height) {
-  if (points.length === 0) return { line: '', area: '' }
-  if (points.length === 1) {
-    const p = points[0]
-    return { line: `M${p.x},${p.y}`, area: `M${p.x},${p.y} L${p.x},${height} Z` }
-  }
-  let line = `M ${points[0].x},${points[0].y}`
-  for (let i = 1; i < points.length; i += 1) {
-    const p0 = points[i - 1]
-    const p1 = points[i]
-    const midX = (p0.x + p1.x) / 2
-    line += ` Q ${p0.x},${p0.y} ${midX},${(p0.y + p1.y) / 2}`
-  }
-  const last = points[points.length - 1]
-  line += ` T ${last.x},${last.y}`
-  const first = points[0]
-  const area = `${line} L ${last.x},${height} L ${first.x},${height} Z`
-  return { line, area }
-}
-
-function WeeklyIncidentChart({ data }) {
-  const W = 640
-  const H = 160
-  const PAD = 8
-  const max = Math.max(1, ...data.map((d) => d.drowsiness + d.distraction))
-  const step = data.length > 1 ? (W - PAD * 2) / (data.length - 1) : 0
-  const yFor = (v) => H - PAD - (v / max) * (H - PAD * 2)
-
-  const drowsyPoints = data.map((d, i) => ({ x: PAD + i * step, y: yFor(d.drowsiness) }))
-  const distractPoints = data.map((d, i) => ({ x: PAD + i * step, y: yFor(d.distraction) }))
-  const drowsy = smoothPaths(drowsyPoints, H)
-  const distract = smoothPaths(distractPoints, H)
-
-  const hasAny = data.some((d) => d.drowsiness + d.distraction > 0)
-
-  return (
-    <Card
-      className="mt-4"
-      title="Sự cố an toàn theo tuần"
-      extra={
-        <div className="flex items-center gap-4 text-xs text-slate-500">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-red-400" /> Buồn ngủ
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-amber-400" /> Mất tập trung
-          </span>
-        </div>
-      }
-    >
-      {!hasAny ? (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="Chưa có sự cố nào trong 8 tuần gần đây"
-        />
-      ) : (
-        <div>
-          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 180 }}>
-            <defs>
-              <linearGradient id="fillDrowsy" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#f87171" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#f87171" stopOpacity="0" />
-              </linearGradient>
-              <linearGradient id="fillDistract" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d={distract.area} fill="url(#fillDistract)" />
-            <path d={drowsy.area} fill="url(#fillDrowsy)" />
-            <path d={distract.line} fill="none" stroke="#f59e0b" strokeWidth="2" />
-            <path d={drowsy.line} fill="none" stroke="#ef4444" strokeWidth="2" />
-          </svg>
-          <div className="mt-1 flex justify-between text-[10px] text-slate-400">
-            {data.map((d) => (
-              <span key={d.label}>{d.label}</span>
-            ))}
-          </div>
-        </div>
-      )}
-    </Card>
-  )
-}
-
 function Dashboard() {
   const navigate = useNavigate()
   const { drivers, loading } = useDrivers()
@@ -399,25 +315,6 @@ function Dashboard() {
     }
   }, [attention, vehicleById])
 
-  const weeklyIncidents = useMemo(() => {
-    const now = dayjs()
-    const firstWeekStart = now.startOf('week').subtract(WEEKS - 1, 'week')
-    const buckets = Array.from({ length: WEEKS }, (_, i) => ({
-      label: firstWeekStart.add(i, 'week').format('DD/MM'),
-      drowsiness: 0,
-      distraction: 0,
-    }))
-    for (const incident of incidents) {
-      const d = toDate(incident.detected_at)
-      if (!d) continue
-      const weekIndex = dayjs(d).startOf('week').diff(firstWeekStart, 'week')
-      if (weekIndex < 0 || weekIndex >= WEEKS) continue
-      if (incident.type === 'drowsiness') buckets[weekIndex].drowsiness += 1
-      else buckets[weekIndex].distraction += 1
-    }
-    return buckets
-  }, [incidents])
-
   return (
     <div>
       <PageHeader
@@ -521,7 +418,7 @@ function Dashboard() {
         </Col>
       </Row>
 
-      <WeeklyIncidentChart data={weeklyIncidents} />
+      <OverviewCharts incidents={incidents} drivers={drivers} />
 
       <AttentionSection data={attention} navigate={navigate} />
 
