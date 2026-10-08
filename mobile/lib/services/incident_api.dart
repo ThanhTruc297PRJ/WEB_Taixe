@@ -26,6 +26,7 @@ class IncidentApi {
     double? confidence,
     String type = 'drowsiness',
     String? note,
+    String? source,
   }) async {
     final token = await _auth.idToken();
     final req =
@@ -37,13 +38,18 @@ class IncidentApi {
             await http.MultipartFile.fromPath(
               'clip',
               clip.path,
-              filename: 'clip.mp4',
+              filename: clip.path.endsWith('.webm') ? 'clip.webm' : 'clip.mp4',
+              contentType: http.MediaType(
+                'video',
+                clip.path.endsWith('.webm') ? 'webm' : 'mp4',
+              ),
             ),
           );
     if (confidence != null) {
       req.fields['confidence'] = confidence.toStringAsFixed(4);
     }
     if (note != null && note.isNotEmpty) req.fields['note'] = note;
+    if (source != null) req.fields['source'] = source;
 
     final res = await http.Response.fromStream(await req.send());
     if (res.statusCode < 200 || res.statusCode >= 300) {

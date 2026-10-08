@@ -375,6 +375,13 @@ function Incidents() {
                   ? '—'
                   : `${Math.round(selected.confidence * 100)}%`}
               </Descriptions.Item>
+              {selected.source && (
+                <Descriptions.Item label="Nguồn camera">
+                  {selected.source === 'external'
+                    ? 'Camera gắn trên xe'
+                    : 'Camera điện thoại'}
+                </Descriptions.Item>
+              )}
               {selected.note && (
                 <Descriptions.Item label="Ghi chú">
                   {selected.note}

@@ -25,6 +25,7 @@ async def report_incident(
     detected_at: str = Form(...),
     confidence: Optional[float] = Form(None),
     note: Optional[str] = Form(None),
+    source: Optional[str] = Form(None),
     user: dict = Depends(get_current_active_driver),
 ):
     data = await clip.read()
@@ -39,6 +40,7 @@ async def report_incident(
             detected_at=detected_at,
             confidence=confidence,
             note=(note or '').strip()[:500] or None,
+            source=source,
             clip_bytes=data,
             content_type=clip.content_type,
         )

@@ -4,7 +4,10 @@ import 'dart:ui';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detection.dart';
 
-class CameraFrameBuffer {
+import 'frame_source.dart';
+
+/// Camera trước của điện thoại.
+class CameraFrameBuffer implements FrameSource {
   CameraController? _controller;
   CameraDescription? _camera;
   bool _isStreaming = false;
@@ -13,6 +16,10 @@ class CameraFrameBuffer {
   bool get isReady => _controller?.value.isInitialized ?? false;
   bool get isStreaming => _isStreaming;
 
+  @override
+  bool get isExternal => false;
+
+  @override
   Future<void> start({
     required void Function(InputImage image) onFrame,
     CameraLensDirection lensDirection = CameraLensDirection.front,
@@ -38,6 +45,7 @@ class CameraFrameBuffer {
     await _startStream(onFrame);
   }
 
+  @override
   Future<void> switchCamera({
     required void Function(InputImage image) onFrame,
   }) async {
@@ -74,6 +82,7 @@ class CameraFrameBuffer {
     _isStreaming = true;
   }
 
+  @override
   Future<String?> recordClip(Duration duration) async {
     final c = _controller;
     if (c == null || !c.value.isInitialized || c.value.isRecordingVideo) {
@@ -93,6 +102,7 @@ class CameraFrameBuffer {
     }
   }
 
+  @override
   Future<void> resumeStream({
     required void Function(InputImage image) onFrame,
   }) async {
@@ -101,6 +111,7 @@ class CameraFrameBuffer {
     await _startStream(onFrame);
   }
 
+  @override
   Future<void> stop() async {
     final c = _controller;
     try {

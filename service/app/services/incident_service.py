@@ -87,13 +87,20 @@ def create_incident(incident: IncidentCreate) -> dict:
     return result
 
 
+def _clip_ext(content_type: Optional[str]) -> str:
+    """mp4 (camera điện thoại) hoặc webm (luồng camera ngoài / laptop demo)."""
+    if content_type and "webm" in content_type:
+        return "webm"
+    return "mp4" if content_type and "mp4" in content_type else "bin"
+
+
 def _upload_clip(uid: str, data: bytes, content_type: Optional[str]) -> str:
     """Đưa clip lên Firebase Storage kèm download token, trả URL tải qua CDN
     (giống URL Firebase SDK sinh ra). App tài xế KHÔNG ghi thẳng Storage —
     gửi file qua backend, backend upload bằng Admin SDK."""
     if bucket is None:
         raise RuntimeError("Chưa cấu hình FIREBASE_STORAGE_BUCKET")
-    ext = "mp4" if content_type and "mp4" in content_type else "bin"
+    ext = _clip_ext(content_type)
     name = f"incident_clips/{uid}/{uuid.uuid4().hex}.{ext}"
     token = str(uuid.uuid4())
     blob = bucket.blob(name)
@@ -109,7 +116,7 @@ def _upload_clip(uid: str, data: bytes, content_type: Optional[str]) -> str:
 def _generate_thumbnail(clip_bytes: bytes, content_type: Optional[str]) -> Optional[bytes]:
     """Trích 1 khung hình từ clip sự cố làm ảnh xem nhanh (best-effort — lỗi
     gì cũng bỏ qua, không được làm hỏng luồng tạo sự cố)."""
-    ext = "mp4" if content_type and "mp4" in content_type else "bin"
+    ext = _clip_ext(content_type)
     tmp_path = None
     cap = None
     try:
@@ -174,6 +181,7 @@ def report_from_driver(
     clip_bytes: bytes,
     content_type: Optional[str],
     note: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> dict:
     """App tài xế: model phát hiện buồn ngủ -> quay 10s -> gửi lên đây.
     driver_id lấy từ token, không tin client."""
@@ -202,6 +210,7 @@ def report_from_driver(
             clip_url=clip_url,
             snapshot_url=snapshot_url,
             note=note,
+            source=source if source in ("phone", "external") else None,
         )
     )
 

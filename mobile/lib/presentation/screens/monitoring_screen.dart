@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/event_log.dart';
+import '../../services/camera/network_frame_source.dart';
 import '../../services/ml/fatigue_scorer.dart';
 import '../viewmodels/monitoring_view_model.dart';
 
@@ -24,13 +25,14 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MonitoringViewModel>()
         ..initForegroundTask()
-        ..loadRecentLogs();
+        ..loadRecentLogs()
+        ..loadCameraSettings();
     });
   }
 
-  Future<bool> _ensurePermissions() async {
+  Future<bool> _ensurePermissions({required bool needCamera}) async {
     final statuses = await [
-      Permission.camera,
+      if (needCamera) Permission.camera,
       Permission.notification,
     ].request();
     return statuses.values.every((s) => s.isGranted);
@@ -44,7 +46,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         await vm.stop();
         return;
       }
-      if (!await _ensurePermissions()) {
+      if (!await _ensurePermissions(needCamera: !vm.useExternalCamera)) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -88,15 +90,46 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                         color: Colors.black87,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.switch_camera,
-                        color: Color(0xFF2A8B88),
-                      ),
-                      tooltip: 'Đổi nguồn Camera',
-                      onPressed: vm.isMonitoring
-                          ? () => vm.switchCamera()
-                          : null,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton.icon(
+                          icon: Icon(
+                            vm.useExternalCamera
+                                ? Icons.wifi_tethering
+                                : Icons.smartphone,
+                            size: 18,
+                          ),
+                          label: Text(
+                            vm.useExternalCamera
+                                ? 'Camera ngoài'
+                                : 'Camera điện thoại',
+                          ),
+                          onPressed: vm.isMonitoring
+                              ? null
+                              : () => showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.white,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(24),
+                                    ),
+                                  ),
+                                  builder: (_) => _CameraSourceSheet(vm: vm),
+                                ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.switch_camera,
+                            color: Color(0xFF2A8B88),
+                          ),
+                          tooltip: 'Đổi camera trước / sau',
+                          onPressed: vm.isMonitoring && vm.networkSource == null
+                              ? () => vm.switchCamera()
+                              : null,
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -126,9 +159,11 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                     borderRadius: BorderRadius.circular(24),
                     child: AspectRatio(
                       aspectRatio: 16 / 11,
-                      child: _CameraPreview(
-                        controller: vm.cameraFrameBuffer.controller,
-                      ),
+                      child: vm.networkSource != null
+                          ? _NetworkPreview(source: vm.networkSource!)
+                          : _CameraPreview(
+                              controller: vm.cameraFrameBuffer.controller,
+                            ),
                     ),
                   ),
                 ),
@@ -250,6 +285,220 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Khung xem trước khi giám sát bằng camera ngoài (ảnh lấy từ luồng mạng).
+class _NetworkPreview extends StatelessWidget {
+  const _NetworkPreview({required this.source});
+  final NetworkFrameSource source;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ValueListenableBuilder(
+          valueListenable: source.latestJpeg,
+          builder: (context, jpeg, _) => jpeg == null
+              ? const ColoredBox(
+                  color: Colors.black,
+                  child: Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                )
+              : Image.memory(jpeg, fit: BoxFit.cover, gaplessPlayback: true),
+        ),
+        Positioned(
+          left: 12,
+          top: 12,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text(
+              'Camera ngoài',
+              style: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        ),
+        ValueListenableBuilder(
+          valueListenable: source.error,
+          builder: (context, err, _) => err == null
+              ? const SizedBox.shrink()
+              : Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    color: Colors.red.withValues(alpha: 0.85),
+                    child: Text(
+                      err,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Chọn nguồn hình: camera điện thoại hoặc camera ngoài qua đường dẫn
+/// (demo: camera laptop chạy scripts/laptop_camera_stream.py).
+class _CameraSourceSheet extends StatefulWidget {
+  const _CameraSourceSheet({required this.vm});
+  final MonitoringViewModel vm;
+
+  @override
+  State<_CameraSourceSheet> createState() => _CameraSourceSheetState();
+}
+
+class _CameraSourceSheetState extends State<_CameraSourceSheet> {
+  late bool _external = widget.vm.useExternalCamera;
+  late final TextEditingController _url = TextEditingController(
+    text: widget.vm.externalCameraUrl,
+  );
+  bool _checking = false;
+  String? _result;
+  bool _ok = false;
+
+  @override
+  void dispose() {
+    _url.dispose();
+    super.dispose();
+  }
+
+  Future<void> _check() async {
+    setState(() {
+      _checking = true;
+      _result = null;
+    });
+    try {
+      final info = await NetworkFrameSource.check(_url.text);
+      setState(() {
+        _ok = true;
+        _result = 'Kết nối được: $info';
+      });
+    } catch (e) {
+      setState(() {
+        _ok = false;
+        _result = e.toString();
+      });
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  Future<void> _save() async {
+    if (_external && _url.text.trim().isEmpty) {
+      setState(() {
+        _ok = false;
+        _result = 'Nhập đường dẫn camera ngoài';
+      });
+      return;
+    }
+    await widget.vm.setCameraSource(external: _external, url: _url.text);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const teal = Color(0xFF2A8B88);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        20 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Nguồn camera giám sát',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          RadioGroup<bool>(
+            groupValue: _external,
+            onChanged: (v) => setState(() => _external = v ?? false),
+            child: const Column(
+              children: [
+                RadioListTile<bool>(
+                  value: false,
+                  activeColor: Color(0xFF2A8B88),
+                  title: Text('Camera điện thoại'),
+                  subtitle: Text('Camera trước của máy này'),
+                ),
+                RadioListTile<bool>(
+                  value: true,
+                  activeColor: Color(0xFF2A8B88),
+                  title: Text('Camera ngoài (đường dẫn)'),
+                  subtitle: Text(
+                    'Camera gắn trên xe phát qua WiFi — demo bằng camera laptop',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_external) ...[
+            const SizedBox(height: 8),
+            TextField(
+              controller: _url,
+              keyboardType: TextInputType.url,
+              decoration: InputDecoration(
+                labelText: 'Đường dẫn camera',
+                hintText: 'http://192.168.1.10:8081',
+                helperText: 'Máy ảo Android dùng http://10.0.2.2:8081',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _checking ? null : _check,
+                  icon: _checking
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.network_check),
+                  label: const Text('Kiểm tra kết nối'),
+                ),
+              ],
+            ),
+          ],
+          if (_result != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _result!,
+              style: TextStyle(
+                color: _ok ? Colors.green.shade700 : Colors.red.shade700,
+                fontSize: 13,
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: teal,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: _save,
+            child: const Text('Lưu'),
+          ),
+        ],
       ),
     );
   }

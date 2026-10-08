@@ -4,11 +4,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detection.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/models/event_log.dart';
 import '../../data/repositories/event_log_repository.dart';
 import '../../services/alert_service.dart';
 import '../../services/camera/camera_frame_buffer.dart';
+import '../../services/camera/frame_source.dart';
+import '../../services/camera/network_frame_source.dart';
 import '../../services/incident_api.dart';
 import '../../services/ml/fatigue_scorer.dart';
 import '../../services/ml/feature_window_aggregator.dart';
@@ -79,6 +82,36 @@ class MonitoringViewModel extends ChangeNotifier {
 
   bool get isMonitoring => phase != MonitoringPhase.idle;
   CameraFrameBuffer get cameraFrameBuffer => _cameraFrameBuffer;
+
+  // ── Nguồn hình: camera điện thoại hoặc camera ngoài qua đường dẫn ──────
+  static const _prefUseExternal = 'camera_use_external';
+  static const _prefExternalUrl = 'camera_external_url';
+  bool useExternalCamera = false;
+  String externalCameraUrl = '';
+  NetworkFrameSource? _networkSource;
+  late FrameSource _source = _cameraFrameBuffer;
+
+  /// Đang giám sát bằng camera ngoài (để màn hình hiện ảnh từ luồng mạng).
+  NetworkFrameSource? get networkSource =>
+      _source is NetworkFrameSource ? _source as NetworkFrameSource : null;
+
+  Future<void> loadCameraSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    useExternalCamera = prefs.getBool(_prefUseExternal) ?? false;
+    externalCameraUrl = prefs.getString(_prefExternalUrl) ?? '';
+    notifyListeners();
+  }
+
+  Future<void> setCameraSource({required bool external, String? url}) async {
+    if (isMonitoring) return;
+    useExternalCamera = external;
+    if (url != null) externalCameraUrl = NetworkFrameSource.normalize(url);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefUseExternal, useExternalCamera);
+    await prefs.setString(_prefExternalUrl, externalCameraUrl);
+    notifyListeners();
+  }
+
   double get drowsyThreshold => _tfliteModelService.meta?.threshold ?? 0.5;
 
   void initForegroundTask() {
@@ -134,8 +167,15 @@ class MonitoringViewModel extends ChangeNotifier {
     _alarmRinging = false;
     phase = MonitoringPhase.monitoring;
 
+    if (useExternalCamera && externalCameraUrl.isNotEmpty) {
+      _networkSource = NetworkFrameSource(externalCameraUrl);
+      _source = _networkSource!;
+    } else {
+      _source = _cameraFrameBuffer;
+    }
+
     try {
-      await _cameraFrameBuffer.start(onFrame: _onFrame);
+      await _source.start(onFrame: _onFrame);
     } catch (_) {
       phase = MonitoringPhase.idle;
       await FlutterForegroundTask.stopService();
@@ -149,7 +189,7 @@ class MonitoringViewModel extends ChangeNotifier {
   Future<void> stop() async {
     if (!isMonitoring) return;
 
-    await _cameraFrameBuffer.stop();
+    await _source.stop();
     await FlutterForegroundTask.stopService();
 
     _alertService.stopAlert();
@@ -173,7 +213,7 @@ class MonitoringViewModel extends ChangeNotifier {
   Future<void> switchCamera() async {
     if (!isMonitoring) return;
     try {
-      await _cameraFrameBuffer.switchCamera(onFrame: _onFrame);
+      await _source.switchCamera(onFrame: _onFrame);
       notifyListeners();
     } catch (e) {
       debugPrint('Lỗi chuyển camera: $e');
@@ -329,12 +369,12 @@ class MonitoringViewModel extends ChangeNotifier {
     String? clipPath;
     try {
       _sendStatus('Đang ghi lại video sự cố...');
-      clipPath = await _cameraFrameBuffer.recordClip(_clipDuration);
+      clipPath = await _source.recordClip(_clipDuration);
     } catch (_) {
       clipPath = null;
     } finally {
       try {
-        await _cameraFrameBuffer.resumeStream(onFrame: _onFrame);
+        await _source.resumeStream(onFrame: _onFrame);
       } catch (_) {}
     }
 
@@ -345,6 +385,7 @@ class MonitoringViewModel extends ChangeNotifier {
           detectedAt: at,
           confidence: confidence,
           note: note,
+          source: _source.isExternal ? 'external' : 'phone',
         );
       } catch (_) {}
     }
@@ -366,7 +407,7 @@ class MonitoringViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    _cameraFrameBuffer.stop();
+    _source.stop();
     _alertService.stopAlert();
     _landmarkFeatureService.dispose();
     _tfliteModelService.dispose();

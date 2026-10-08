@@ -14,6 +14,8 @@ class IncidentBase(BaseModel):
     snapshot_url: Optional[str] = None  # ảnh chụp lúc vi phạm (URL tải Firebase Storage)
     clip_url: Optional[str] = None  # video clip ngắn (URL tải Firebase Storage)
     note: Optional[str] = None
+    # Nguồn hình: "phone" (camera điện thoại) | "external" (camera gắn xe / laptop demo).
+    source: Optional[str] = None
 
 
 class IncidentCreate(IncidentBase):
