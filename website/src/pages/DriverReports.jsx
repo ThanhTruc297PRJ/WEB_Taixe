@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { App, Button, Card, Image, Segmented, Table, Tag } from 'antd'
 import { CheckOutlined, ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { formatDateTime } from '../utils/datetime'
 import { useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import { useDrivers } from '../contexts/useDrivers'
@@ -69,8 +70,8 @@ function DriverReports() {
     {
       title: 'Thời gian',
       dataIndex: 'created_at',
-      width: 150,
-      render: (v) => (v ? dayjs(v).format('HH:mm DD/MM/YYYY') : '—'),
+      width: 160,
+      render: (v) => <span className="whitespace-nowrap">{formatDateTime(v)}</span>,
     },
     {
       title: 'Tài xế',

@@ -25,7 +25,7 @@ import {
   WifiOutlined,
   CustomerServiceOutlined,
 } from '@ant-design/icons'
-import dayjs from 'dayjs'
+import { formatDateTime } from '../utils/datetime'
 import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
 import {
@@ -283,7 +283,7 @@ function Radio() {
         <Tooltip
           title={
             s.last_played_at
-              ? `Lần cuối: ${dayjs(s.last_played_at).format('HH:mm DD/MM/YYYY')}`
+              ? `Lần cuối: ${formatDateTime(s.last_played_at)}`
               : 'Chưa ai nghe'
           }
         >

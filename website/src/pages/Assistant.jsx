@@ -20,7 +20,7 @@ import {
   UserOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
-import dayjs from 'dayjs'
+import { formatDateTime } from '../utils/datetime'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { apiPost } from '../services/api'
@@ -253,10 +253,7 @@ function KnowledgeBaseTab() {
         title: 'Cập nhật',
         dataIndex: 'updated_at',
         width: 160,
-        render: (v) => {
-          const d = toDate(v)
-          return d ? dayjs(d).format('DD/MM/YYYY HH:mm') : '—'
-        },
+        render: (v) => <span className="whitespace-nowrap">{formatDateTime(v)}</span>,
       },
       {
         title: '',
@@ -396,11 +393,8 @@ function ChatLogsTab() {
     {
       title: 'Thời gian',
       dataIndex: 'created_at',
-      width: 150,
-      render: (v) => {
-        const d = toDate(v)
-        return d ? dayjs(d).format('DD/MM/YYYY HH:mm') : '—'
-      },
+      width: 160,
+      render: (v) => <span className="whitespace-nowrap">{formatDateTime(v)}</span>,
     },
     {
       title: 'Người hỏi',

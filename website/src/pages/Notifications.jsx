@@ -3,6 +3,7 @@ import { Alert, App, Button, Card, Col, Input, Row, Segmented, Table, Tooltip } 
 import { ArrowRightOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
+import { formatDateTime } from '../utils/datetime'
 import PageHeader from '../components/PageHeader'
 import { getAdminNotifications } from '../services/adminNotifications'
 import {
@@ -155,12 +156,10 @@ function Notifications() {
         r.when ? (
           <div className="leading-snug">
             <div className="text-xs text-slate-400">{r.section.timeLabel}</div>
-            <div className="text-sm text-slate-700">
-              {dayjs(r.when).format(
-                ['maintenance_due', 'inspections_due'].includes(r.section.key)
-                  ? 'DD/MM/YYYY'
-                  : 'HH:mm DD/MM/YYYY',
-              )}
+            <div className="whitespace-nowrap text-sm text-slate-700">
+              {['maintenance_due', 'inspections_due'].includes(r.section.key)
+                ? dayjs(r.when).format('DD/MM/YYYY')
+                : formatDateTime(r.when)}
             </div>
           </div>
         ) : (

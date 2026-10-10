@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Alert, App, Button, Descriptions, Image, Input, Modal, Space, Tag, Tooltip } from 'antd'
 import dayjs from 'dayjs'
+import { formatDateTime } from '../utils/datetime'
 import { confirmJob, rejectJob } from '../services/vehicleJobs'
 
 const AWAITING = 'awaiting_confirmation'
@@ -84,7 +85,7 @@ function JobReviewModal({ kind, job, title, plate, driverName, onClose, onDone }
         {
           key: 'at',
           label: 'Lúc',
-          children: sub.submitted_at ? dayjs(sub.submitted_at).format('HH:mm DD/MM/YYYY') : '—',
+          children: formatDateTime(sub.submitted_at),
         },
         { key: 'odo', label: 'Số km đồng hồ', children: km(sub.odometer) },
         ...(kind === 'maintenance'

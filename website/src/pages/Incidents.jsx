@@ -16,6 +16,7 @@ import {
 } from 'antd'
 import { PrinterOutlined, ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { formatDateTime } from '../utils/datetime'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { listIncidents } from '../services/incidents'
@@ -240,7 +241,8 @@ function Incidents() {
     {
       title: 'Thời gian ghi nhận',
       dataIndex: 'detected_at',
-      render: (d) => dayjs(toDate(d) ?? d).format('DD/MM/YYYY HH:mm'),
+      width: 170,
+      render: (d) => <span className="whitespace-nowrap">{formatDateTime(d)}</span>,
     },
     {
       title: 'Tài xế',

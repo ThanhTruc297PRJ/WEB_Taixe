@@ -22,6 +22,7 @@ import {
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
+import { formatDateTime } from '../utils/datetime'
 import { listVehicles } from '../services/vehicles'
 import { listDrivers } from '../services/drivers'
 import { getSettings } from '../services/settings'
@@ -300,8 +301,7 @@ function Inspections() {
     {
       title: 'Khung giờ hẹn',
       dataIndex: 'appointment_at',
-      render: (d) =>
-        d ? dayjs(d).format('DD/MM/YYYY HH:mm') : 'Chưa đặt lịch',
+      render: (d) => <span className="whitespace-nowrap">{formatDateTime(d, 'Chưa đặt lịch')}</span>,
     },
     {
       title: 'Tem cũ hết hạn',

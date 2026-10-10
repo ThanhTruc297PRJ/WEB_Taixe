@@ -24,7 +24,7 @@ import {
   PlayCircleFilled,
   PauseCircleFilled,
 } from '@ant-design/icons'
-import dayjs from 'dayjs'
+import { formatDateTime } from '../utils/datetime'
 import { useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
@@ -400,7 +400,7 @@ function Music() {
                   </div>
                 </div>
                 <div className="shrink-0 text-xs text-slate-400">
-                  {r.reported_at ? dayjs(r.reported_at).format('HH:mm DD/MM/YYYY') : ''}
+                  {formatDateTime(r.reported_at, '')}
                 </div>
               </div>
             </List.Item>
