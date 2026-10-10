@@ -17,6 +17,8 @@ function badgeFor({ key, driversTotal, pendingCount, attention, vehicleCount }) 
       return driversTotal > 0
         ? { count: driversTotal, color: pendingCount > 0 ? '#f59e0b' : '#475569' }
         : null
+    case '/notifications':
+      return attention.total > 0 ? { count: attention.total, color: '#dc2626' } : null
     case '/incidents': {
       const c = attention.recent_incidents.count
       return c > 0 ? { count: `${c} Mới`, color: '#dc2626' } : null

@@ -10,6 +10,7 @@ import {
   SafetyCertificateOutlined,
   FileTextOutlined,
   MessageOutlined,
+  BellOutlined,
   WifiOutlined,
 } from '@ant-design/icons'
 
@@ -19,6 +20,7 @@ export const NAV_SECTIONS = [
     label: 'Vận hành',
     items: [
       { key: '/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan' },
+      { key: '/notifications', icon: <BellOutlined />, label: 'Thông báo' },
       { key: '/drivers', icon: <TeamOutlined />, label: 'Quản lý tài xế' },
       { key: '/incidents', icon: <WarningOutlined />, label: 'Sự cố an toàn' },
       {

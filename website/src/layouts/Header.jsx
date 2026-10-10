@@ -37,6 +37,17 @@ const styles = {
   title: { fontSize: 16, fontWeight: 700, color: '#0f172a' },
   headMeta: { fontSize: 13, color: '#64748b' },
   body: { overflowY: 'auto', padding: '6px 0 10px' },
+  openAll: {
+    border: 'none',
+    borderBottom: '1px solid #e2e8f0',
+    background: '#f8fafc',
+    padding: '8px 18px',
+    textAlign: 'left',
+    fontSize: 13,
+    fontWeight: 500,
+    color: '#2563eb',
+    cursor: 'pointer',
+  },
   empty: { padding: '28px 0' },
   section: { padding: '10px 10px 4px' },
   sectionHead: {
@@ -184,6 +195,13 @@ function NotificationPanel({ data, error, newIds, onNavigate }) {
         <span style={styles.title}>Việc cần chú ý</span>
         {!error && hasAny && <span style={styles.headMeta}>{total} việc chưa xử lý</span>}
       </div>
+      <button
+        type="button"
+        onClick={() => onNavigate('/notifications')}
+        style={styles.openAll}
+      >
+        Mở trang Thông báo để quản lý tất cả →
+      </button>
       <div style={styles.body}>
         {error && (
           <Empty

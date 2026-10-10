@@ -20,6 +20,7 @@ const Assistant = lazy(() => import('../pages/Assistant'))
 const Settings = lazy(() => import('../pages/Settings'))
 const CostReport = lazy(() => import('../pages/CostReport'))
 const DriverReports = lazy(() => import('../pages/DriverReports'))
+const Notifications = lazy(() => import('../pages/Notifications'))
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
           { path: 'incidents', element: <Incidents /> },
           { path: 'driver-reports', element: <DriverReports /> },
           { path: 'music', element: <Music /> },
+          { path: 'notifications', element: <Notifications /> },
           { path: 'radio', element: <Radio /> },
           { path: 'assistant', element: <Assistant /> },
           { path: 'settings', element: <Settings /> },

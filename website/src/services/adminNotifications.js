@@ -1,3 +1,5 @@
 import { apiGet } from './api'
 
-export const getAdminNotifications = () => apiGet('/admin/notifications/')
+// limit: số mục mỗi nhóm (chuông lấy 5, trang Thông báo lấy toàn bộ).
+export const getAdminNotifications = (limit) =>
+  apiGet(`/admin/notifications/${limit ? `?limit=${limit}` : ''}`)

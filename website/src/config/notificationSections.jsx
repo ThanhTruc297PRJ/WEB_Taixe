@@ -10,7 +10,7 @@ import {
 import dayjs from 'dayjs'
 
 // Nguồn cấu hình DUY NHẤT cho các loại "việc cần chú ý" — dùng chung bởi chuông
-// thông báo (Header) và trang Tổng quan (Dashboard), tránh lặp code/định
+// thông báo (Header), trang Thông báo và trang Tổng quan (Dashboard), tránh lặp code/định
 // nghĩa lệch nhau giữa 2 nơi hiển thị cùng 1 dữ liệu từ GET /admin/notifications/.
 /** Đường dẫn (đã lọc) của cả nhóm — `path` có thể là chuỗi hoặc hàm theo dữ liệu nhóm. */
 export const sectionPath = (s, section) =>
@@ -23,6 +23,9 @@ export const itemPathOf = (s, item, section) =>
 export const NOTIFICATION_SECTIONS = [
   {
     key: 'pending_drivers',
+    short: 'Duyệt tài xế',
+    timeOf: (item) => item.submitted_at,
+    timeLabel: 'Đăng ký lúc',
     color: '#2563eb',
     bg: '#eff6ff',
     label: 'Tài xế chờ duyệt',
@@ -34,6 +37,9 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'maintenance_due',
+    short: 'Bảo trì',
+    timeOf: (item) => item.scheduled_date,
+    timeLabel: 'Ngày hẹn',
     color: '#d97706',
     bg: '#fffbeb',
     label: 'Bảo trì sắp tới hạn',
@@ -49,6 +55,9 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'inspections_due',
+    short: 'Đăng kiểm',
+    timeOf: (item) => item.old_sticker_expiry,
+    timeLabel: 'Tem hết hạn',
     color: '#0d9488',
     bg: '#f0fdfa',
     label: 'Đăng kiểm sắp tới hạn',
@@ -62,6 +71,9 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'recent_incidents',
+    short: 'Sự cố',
+    timeOf: (item) => item.detected_at,
+    timeLabel: 'Ghi nhận lúc',
     color: '#dc2626',
     bg: '#fef2f2',
     label: 'Sự cố an toàn gần đây',
@@ -74,6 +86,9 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'driver_reports',
+    short: 'Báo cáo tài xế',
+    timeOf: (item) => item.created_at,
+    timeLabel: 'Gửi lúc',
     color: '#7c3aed',
     bg: '#f5f3ff',
     label: 'Báo cáo từ tài xế',
@@ -87,6 +102,9 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'awaiting_confirmation',
+    short: 'Chờ xác nhận',
+    timeOf: (item) => item.submitted_at,
+    timeLabel: 'Tài xế gửi lúc',
     color: '#9333ea',
     bg: '#faf5ff',
     label: 'Chờ xác nhận bảo trì / đăng kiểm',
@@ -105,6 +123,9 @@ export const NOTIFICATION_SECTIONS = [
   },
   {
     key: 'reported_music',
+    short: 'Nhạc bị báo cáo',
+    timeOf: () => null,
+    timeLabel: '',
     color: '#db2777',
     bg: '#fdf2f8',
     label: 'Bài hát bị báo cáo',

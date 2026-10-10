@@ -21,7 +21,7 @@ _ITEM_LIMIT = 5
 _INCIDENT_WINDOW_HOURS = 24
 
 
-def _pending_drivers() -> dict:
+def _pending_drivers(limit: int = _ITEM_LIMIT) -> dict:
     pending = [d for d in driver_service.list_drivers() if d.get("status") == "pending"]
 
     def sort_key(d: dict):
@@ -38,15 +38,15 @@ def _pending_drivers() -> dict:
             "email_verified": bool(d.get("email_verified")),
             "submitted_at": d.get("submitted_at"),
         }
-        for d in pending[:_ITEM_LIMIT]
+        for d in pending[:limit]
     ]
     return {"count": len(pending), "items": items}
 
 
-def _maintenance_due() -> dict:
+def _maintenance_due(limit: int = _ITEM_LIMIT) -> dict:
     due = maintenance_service.list_upcoming()
     items = []
-    for m in due[:_ITEM_LIMIT]:
+    for m in due[:limit]:
         vehicle = vehicle_service.get_vehicle(m.get("vehicle_id"))
         items.append(
             {
@@ -65,10 +65,10 @@ def _maintenance_due() -> dict:
     return {"count": len(due), "items": items}
 
 
-def _inspections_due() -> dict:
+def _inspections_due(limit: int = _ITEM_LIMIT) -> dict:
     due = inspection_service.list_upcoming()
     items = []
-    for i in due[:_ITEM_LIMIT]:
+    for i in due[:limit]:
         vehicle = vehicle_service.get_vehicle(i.get("vehicle_id"))
         items.append(
             {
@@ -82,25 +82,26 @@ def _inspections_due() -> dict:
     return {"count": len(due), "items": items}
 
 
-def _recent_incidents() -> dict:
+def _recent_incidents(limit: int = _ITEM_LIMIT) -> dict:
     recent = incident_service.list_recent(hours=_INCIDENT_WINDOW_HOURS)
     items = [
         {
             "id": i["id"],
             "driver_id": i.get("driver_id"),
+            "name": (driver_service.get_driver(i.get("driver_id") or "") or {}).get("name"),
             "type": i.get("type"),
             "points": i.get("points"),
             "detected_at": i.get("detected_at"),
         }
-        for i in recent[:_ITEM_LIMIT]
+        for i in recent[:limit]
     ]
     return {"count": len(recent), "items": items}
 
 
-def _driver_reports() -> dict:
+def _driver_reports(limit: int = _ITEM_LIMIT) -> dict:
     new = driver_report_service.list_new()
     items = []
-    for r in new[:_ITEM_LIMIT]:
+    for r in new[:limit]:
         driver = driver_service.get_driver(r.get("driver_id", ""))
         items.append(
             {
@@ -113,11 +114,11 @@ def _driver_reports() -> dict:
     return {"count": len(new), "items": items}
 
 
-def _awaiting_confirmation() -> dict:
+def _awaiting_confirmation(limit: int = _ITEM_LIMIT) -> dict:
     """Bảo trì / đăng kiểm tài xế đã báo xong, chờ admin xác nhận."""
     awaiting = vehicle_job_service.list_awaiting()
     items = []
-    for j in awaiting[:_ITEM_LIMIT]:
+    for j in awaiting[:limit]:
         vehicle = vehicle_service.get_vehicle(j.get("vehicle_id", ""))
         sub = j.get("driver_submission") or {}
         driver = driver_service.get_driver(sub.get("submitted_by", ""))
@@ -139,7 +140,7 @@ def _awaiting_confirmation() -> dict:
     return {"count": len(awaiting), "items": items}
 
 
-def _reported_music() -> dict:
+def _reported_music(limit: int = _ITEM_LIMIT) -> dict:
     # Sắp theo số lượt báo cáo giảm dần -> bài bị nhiều người báo cáo nhất lên
     # đầu danh sách xem trước (quan trọng hơn bài chỉ 1 người báo cáo nhầm).
     reported = sorted(
@@ -154,20 +155,21 @@ def _reported_music() -> dict:
             "artist": t.get("artist"),
             "report_count": t.get("report_count") or 0,
         }
-        for t in reported[:_ITEM_LIMIT]
+        for t in reported[:limit]
     ]
     return {"count": len(reported), "items": items}
 
 
-def get_summary() -> dict:
+def get_summary(limit: int = _ITEM_LIMIT) -> dict:
+    """`limit`: số mục mỗi nhóm — chuông lấy 5, trang Thông báo lấy hết."""
     sections = {
-        "pending_drivers": _pending_drivers(),
-        "maintenance_due": _maintenance_due(),
-        "inspections_due": _inspections_due(),
-        "recent_incidents": _recent_incidents(),
-        "driver_reports": _driver_reports(),
-        "awaiting_confirmation": _awaiting_confirmation(),
-        "reported_music": _reported_music(),
+        "pending_drivers": _pending_drivers(limit),
+        "maintenance_due": _maintenance_due(limit),
+        "inspections_due": _inspections_due(limit),
+        "recent_incidents": _recent_incidents(limit),
+        "driver_reports": _driver_reports(limit),
+        "awaiting_confirmation": _awaiting_confirmation(limit),
+        "reported_music": _reported_music(limit),
     }
     sections["total"] = sum(s["count"] for s in sections.values())
     return sections
