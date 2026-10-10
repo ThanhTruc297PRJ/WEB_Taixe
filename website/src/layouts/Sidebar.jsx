@@ -21,10 +21,10 @@ function badgeFor({ key, driversTotal, pendingCount, attention, vehicleCount }) 
       return attention.total > 0 ? { count: attention.total, color: '#dc2626' } : null
     case '/incidents': {
       const c = attention.recent_incidents.count
-      return c > 0 ? { count: `${c} Mới`, color: '#dc2626' } : null
+      return c > 0 ? { count: c, color: '#dc2626' } : null
     }
     case '/vehicles':
-      return vehicleCount > 0 ? { count: `${vehicleCount} xe`, color: '#475569' } : null
+      return vehicleCount > 0 ? { count: vehicleCount, color: '#475569' } : null
     case '/maintenance': {
       const c = attention.maintenance_due.count
       return c > 0 ? { count: c, color: '#f59e0b' } : null
@@ -35,7 +35,7 @@ function badgeFor({ key, driversTotal, pendingCount, attention, vehicleCount }) 
     }
     case '/driver-reports': {
       const c = attention.driver_reports.count
-      return c > 0 ? { count: `${c} Mới`, color: '#f59e0b' } : null
+      return c > 0 ? { count: c, color: '#f59e0b' } : null
     }
     case '/music': {
       const c = attention.reported_music.count
@@ -78,7 +78,7 @@ function Sidebar({ collapsed }) {
         key: item.key,
         icon: item.icon,
         label: b ? (
-          <span className="flex items-center justify-between">
+          <span className="flex items-center gap-2">
             {item.label}
             {b.dot ? (
               <span
@@ -99,7 +99,7 @@ function Sidebar({ collapsed }) {
   const displayLabel = user?.displayName || user?.email || 'Admin'
 
   return (
-    <Sider trigger={null} collapsible collapsed={collapsed} width={232} collapsedWidth={72}>
+    <Sider trigger={null} collapsible collapsed={collapsed} width={256} collapsedWidth={72}>
       <div className="flex h-full flex-col">
         <div className="flex h-[60px] shrink-0 items-center gap-2.5 px-4 text-white">
           <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-lg">
