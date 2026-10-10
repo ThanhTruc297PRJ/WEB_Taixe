@@ -25,16 +25,22 @@ function badgeFor({ key, driversTotal, pendingCount, attention, vehicleCount }) 
     }
     case '/vehicles':
       return vehicleCount > 0 ? { count: `${vehicleCount} xe`, color: '#475569' } : null
-    case '/maintenance':
-      return attention.maintenance_due.count > 0 ? { dot: true, color: '#f59e0b' } : null
-    case '/inspections':
-      return attention.inspections_due.count > 0 ? { dot: true, color: '#f59e0b' } : null
+    case '/maintenance': {
+      const c = attention.maintenance_due.count
+      return c > 0 ? { count: c, color: '#f59e0b' } : null
+    }
+    case '/inspections': {
+      const c = attention.inspections_due.count
+      return c > 0 ? { count: c, color: '#f59e0b' } : null
+    }
     case '/driver-reports': {
       const c = attention.driver_reports.count
       return c > 0 ? { count: `${c} Mới`, color: '#f59e0b' } : null
     }
-    case '/music':
-      return attention.reported_music.count > 0 ? { dot: true, color: '#dc2626' } : null
+    case '/music': {
+      const c = attention.reported_music.count
+      return c > 0 ? { count: c, color: '#dc2626' } : null
+    }
     default:
       return null
   }
