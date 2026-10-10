@@ -83,6 +83,24 @@ class CameraFrameBuffer implements FrameSource {
   }
 
   @override
+  Future<String?> capturePhoto() async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || c.value.isRecordingVideo) {
+      return null;
+    }
+    try {
+      if (_isStreaming) {
+        await c.stopImageStream();
+        _isStreaming = false;
+      }
+      final file = await c.takePicture();
+      return file.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
   Future<String?> recordClip(Duration duration) async {
     final c = _controller;
     if (c == null || !c.value.isInitialized || c.value.isRecordingVideo) {

@@ -11,8 +11,9 @@ class IncidentBase(BaseModel):
     detected_at: datetime
     confidence: Optional[float] = None
     points: int = 0  # điểm vi phạm; cộng dồn để so mốc 10 / 22 / 30
-    snapshot_url: Optional[str] = None  # ảnh chụp lúc vi phạm (URL tải Firebase Storage)
+    snapshot_url: Optional[str] = None  # thumbnail tự trích từ clip (URL Firebase Storage)
     clip_url: Optional[str] = None  # video clip ngắn (URL tải Firebase Storage)
+    photo_url: Optional[str] = None  # ảnh chụp mặt tài xế lúc báo động
     note: Optional[str] = None
     # Nguồn hình: "phone" (camera điện thoại) | "external" (camera gắn xe / laptop demo).
     source: Optional[str] = None

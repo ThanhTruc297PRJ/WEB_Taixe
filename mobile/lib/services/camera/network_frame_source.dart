@@ -116,6 +116,24 @@ class NetworkFrameSource implements FrameSource {
   }) async {}
 
   @override
+  @override
+  Future<String?> capturePhoto() async {
+    try {
+      final res = await _client
+          .get(Uri.parse('$baseUrl/snapshot.jpg'))
+          .timeout(_requestTimeout);
+      if (res.statusCode != 200 || res.bodyBytes.isEmpty) return null;
+      final file = File(
+        '${(_dir ?? Directory.systemTemp).path}/photo_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      await file.writeAsBytes(res.bodyBytes, flush: true);
+      return file.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
   Future<String?> recordClip(Duration duration) async {
     try {
       final res = await _client

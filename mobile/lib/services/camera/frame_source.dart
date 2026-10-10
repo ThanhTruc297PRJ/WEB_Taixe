@@ -13,6 +13,9 @@ abstract class FrameSource {
 
   Future<void> switchCamera({required void Function(InputImage image) onFrame});
 
+  /// Chụp 1 ảnh tĩnh JPEG, trả đường dẫn file tạm hoặc null.
+  Future<String?> capturePhoto();
+
   /// Quay clip sự cố, trả đường dẫn file tạm (mp4 hoặc webm) hoặc null.
   Future<String?> recordClip(Duration duration);
 

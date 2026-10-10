@@ -27,6 +27,7 @@ class IncidentApi {
     String type = 'drowsiness',
     String? note,
     String? source,
+    File? photo,
   }) async {
     final token = await _auth.idToken();
     final req =
@@ -50,6 +51,16 @@ class IncidentApi {
     }
     if (note != null && note.isNotEmpty) req.fields['note'] = note;
     if (source != null) req.fields['source'] = source;
+    if (photo != null) {
+      req.files.add(
+        await http.MultipartFile.fromPath(
+          'photo',
+          photo.path,
+          filename: 'driver_photo.jpg',
+          contentType: http.MediaType('image', 'jpeg'),
+        ),
+      );
+    }
 
     final res = await http.Response.fromStream(await req.send());
     if (res.statusCode < 200 || res.statusCode >= 300) {

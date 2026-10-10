@@ -15,7 +15,8 @@ router = APIRouter(
 # App tài xế tự gửi sự cố (kèm clip). Chỉ cần tài khoản đã được duyệt.
 self_router = APIRouter(prefix="/incidents", tags=["incidents (app tài xế)"])
 
-_MAX_CLIP_BYTES = 30 * 1024 * 1024  # 30MB — clip 480p ~10s thường 1-3MB
+_MAX_CLIP_BYTES = 30 * 1024 * 1024   # 30MB — clip 480p ~10s thường 1-3MB
+_MAX_PHOTO_BYTES = 5 * 1024 * 1024   # 5MB — ảnh JPEG mặt tài xế
 
 
 @self_router.post("/report", status_code=201)
@@ -26,6 +27,7 @@ async def report_incident(
     confidence: Optional[float] = Form(None),
     note: Optional[str] = Form(None),
     source: Optional[str] = Form(None),
+    photo: Optional[UploadFile] = File(None),
     user: dict = Depends(get_current_active_driver),
 ):
     data = await clip.read()
@@ -33,6 +35,13 @@ async def report_incident(
         raise HTTPException(status_code=422, detail="Clip rỗng")
     if len(data) > _MAX_CLIP_BYTES:
         raise HTTPException(status_code=413, detail="Clip quá lớn")
+
+    photo_bytes: Optional[bytes] = None
+    if photo is not None:
+        photo_bytes = await photo.read()
+        if len(photo_bytes) > _MAX_PHOTO_BYTES:
+            photo_bytes = None  # bỏ qua ảnh quá lớn, không reject cả request
+
     try:
         incident = incident_service.report_from_driver(
             uid=user["uid"],
@@ -43,6 +52,7 @@ async def report_incident(
             source=source,
             clip_bytes=data,
             content_type=clip.content_type,
+            photo_bytes=photo_bytes,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))

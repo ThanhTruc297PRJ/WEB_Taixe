@@ -366,7 +366,14 @@ class MonitoringViewModel extends ChangeNotifier {
     _lastIncidentAt = at;
     notifyListeners();
 
+    String? photoPath;
     String? clipPath;
+    try {
+      _sendStatus('Đang chụp ảnh sự cố...');
+      photoPath = await _source.capturePhoto();
+    } catch (_) {
+      photoPath = null;
+    }
     try {
       _sendStatus('Đang ghi lại video sự cố...');
       clipPath = await _source.recordClip(_clipDuration);
@@ -386,12 +393,17 @@ class MonitoringViewModel extends ChangeNotifier {
           confidence: confidence,
           note: note,
           source: _source.isExternal ? 'external' : 'phone',
+          photo: photoPath != null ? File(photoPath) : null,
         );
       } catch (_) {}
     }
     try {
       if (clipPath != null) {
         final f = File(clipPath);
+        if (await f.exists()) await f.delete();
+      }
+      if (photoPath != null) {
+        final f = File(photoPath);
         if (await f.exists()) await f.delete();
       }
     } catch (_) {}

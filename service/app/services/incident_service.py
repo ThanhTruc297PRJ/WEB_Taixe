@@ -173,6 +173,20 @@ def _upload_snapshot(uid: str, thumbnail_bytes: bytes) -> str:
     )
 
 
+def _upload_photo(uid: str, photo_bytes: bytes) -> str:
+    """Upload ảnh mặt tài xế lúc báo động lên Storage, trả URL tải."""
+    bucket = storage.bucket()
+    name = f"incident_photos/{uid}/{uuid.uuid4().hex}.jpg"
+    blob = bucket.blob(name)
+    token = uuid.uuid4().hex
+    blob.metadata = {"firebaseStorageDownloadTokens": token}
+    blob.upload_from_string(photo_bytes, content_type="image/jpeg")
+    return (
+        f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}"
+        f"/o/{name.replace('/', '%2F')}?alt=media&token={token}"
+    )
+
+
 def report_from_driver(
     uid: str,
     incident_type: str,
@@ -182,6 +196,7 @@ def report_from_driver(
     content_type: Optional[str],
     note: Optional[str] = None,
     source: Optional[str] = None,
+    photo_bytes: Optional[bytes] = None,
 ) -> dict:
     """App tài xế: model phát hiện buồn ngủ -> quay 10s -> gửi lên đây.
     driver_id lấy từ token, không tin client."""
@@ -193,9 +208,14 @@ def report_from_driver(
         try:
             snapshot_url = _upload_snapshot(uid, thumbnail_bytes)
         except Exception:
-            # Ảnh xem nhanh chỉ là tiện ích thêm; lỗi upload không được làm
-            # fail việc tạo sự cố (clip gốc đã lưu thành công ở trên).
             snapshot_url = None
+
+    photo_url = None
+    if photo_bytes:
+        try:
+            photo_url = _upload_photo(uid, photo_bytes)
+        except Exception:
+            photo_url = None
 
     try:
         dt = datetime.fromisoformat(detected_at.replace("Z", "+00:00"))
@@ -209,6 +229,7 @@ def report_from_driver(
             confidence=confidence,
             clip_url=clip_url,
             snapshot_url=snapshot_url,
+            photo_url=photo_url,
             note=note,
             source=source if source in ("phone", "external") else None,
         )

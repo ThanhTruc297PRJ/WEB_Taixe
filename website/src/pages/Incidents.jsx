@@ -7,6 +7,7 @@ import {
   Col,
   Descriptions,
   Empty,
+  Image,
   Modal,
   Row,
   Select,
@@ -243,6 +244,17 @@ function Incidents() {
       key: 'stt',
       width: 55,
       render: (_, __, index) => index + 1,
+    },
+    {
+      title: 'Ảnh tài xế',
+      dataIndex: 'photo_url',
+      width: 90,
+      render: (url) =>
+        url ? (
+          <Image src={url} width={56} height={56} className="rounded object-cover" />
+        ) : (
+          <span className="text-slate-300">—</span>
+        ),
     },
     {
       title: 'Thời gian ghi nhận',
