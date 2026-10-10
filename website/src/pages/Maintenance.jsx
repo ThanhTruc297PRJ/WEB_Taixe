@@ -60,6 +60,22 @@ const isOverdue = (record) =>
   record.status === 'pending' &&
   dayjs(record.scheduled_date).isBefore(dayjs(), 'day')
 
+// "Sắp / đã tới hạn": còn chờ và đã vào khoảng báo trước theo NGÀY hoặc theo
+// KM — cùng điều kiện với chuông thông báo và ô Bảo trì ở trang Tổng quan
+// (backend maintenance_service.list_upcoming), nên số lượng luôn khớp.
+const isDueSoon = (record, vehicleKm) => {
+  if (record.status !== 'pending') return false
+  if (record.scheduled_date) {
+    const daysLeft = dayjs(record.scheduled_date).diff(dayjs(), 'hour') / 24
+    if (daysLeft <= (record.remind_days_before ?? 7)) return true
+  }
+  if (record.due_odometer_km != null && vehicleKm != null) {
+    if (record.due_odometer_km - vehicleKm <= (record.remind_km_before ?? 500))
+      return true
+  }
+  return false
+}
+
 function Maintenance() {
   const { message } = App.useApp()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -68,9 +84,14 @@ function Maintenance() {
   const [vehicles, setVehicles] = useState([])
   const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState(
-    () => searchParams.get('status') || 'all',
-  )
+  const statusFilter = searchParams.get('status') || 'all'
+  const setStatusFilter = (value) =>
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value && value !== 'all') next.set('status', value)
+      else next.delete('status')
+      return next
+    })
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -119,6 +140,12 @@ function Maintenance() {
     return map
   }, [vehicles])
 
+  const vehicleKm = useMemo(() => {
+    const map = {}
+    for (const v of vehicles) map[v.id] = v.current_odometer_km
+    return map
+  }, [vehicles])
+
   const driverName = useMemo(() => {
     const map = {}
     for (const d of drivers) map[d.id] = d.name
@@ -144,11 +171,13 @@ function Maintenance() {
     if (vehicleFilter)
       sorted = sorted.filter((r) => r.vehicle_id === vehicleFilter)
     if (statusFilter === 'all') return sorted
+    if (statusFilter === 'due')
+      return sorted.filter((r) => isDueSoon(r, vehicleKm[r.vehicle_id]))
     if (statusFilter === 'overdue') return sorted.filter(isOverdue)
     if (statusFilter === 'pending')
       return sorted.filter((r) => r.status === 'pending' && !isOverdue(r))
     return sorted.filter((r) => r.status === statusFilter)
-  }, [rows, statusFilter, vehicleFilter])
+  }, [rows, statusFilter, vehicleFilter, vehicleKm])
 
   const handleScanReminders = async () => {
     setScanning(true)
@@ -377,9 +406,10 @@ function Maintenance() {
         <Select
           value={statusFilter}
           onChange={setStatusFilter}
-          style={{ width: 200 }}
+          style={{ width: 220 }}
           options={[
             { value: 'all', label: 'Tất cả' },
+            { value: 'due', label: 'Sắp / đã tới hạn' },
             { value: 'awaiting_confirmation', label: 'Chờ xác nhận' },
             { value: 'overdue', label: 'Quá hạn' },
             { value: 'pending', label: 'Chờ tới hạn' },

@@ -53,6 +53,14 @@ const RESULT_META = {
   failed: { label: 'Không đạt', color: 'red' },
 }
 
+// Sắp / đã hết hạn tem: còn chờ và đã vào khoảng báo trước — cùng điều kiện với
+// chuông thông báo và ô Đăng kiểm ở trang Tổng quan (inspection_service.list_upcoming).
+const isDueSoon = (record) =>
+  record.status === 'pending' &&
+  !!record.old_sticker_expiry &&
+  dayjs(record.old_sticker_expiry).diff(dayjs(), 'hour') / 24 <=
+    (record.remind_days_before ?? 15)
+
 // Quá hạn khi tem cũ đã hết hạn mà vẫn chưa đăng kiểm xong.
 const isOverdue = (record) =>
   record.status === 'pending' &&
@@ -65,7 +73,14 @@ function Inspections() {
   const [vehicles, setVehicles] = useState([])
   const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState('all')
+  const statusFilter = searchParams.get('status') || 'all'
+  const setStatusFilter = (value) =>
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value && value !== 'all') next.set('status', value)
+      else next.delete('status')
+      return next
+    })
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -139,6 +154,7 @@ function Inspections() {
         dayjs(b.old_sticker_expiry).valueOf(),
     )
     if (statusFilter === 'all') return sorted
+    if (statusFilter === 'due') return sorted.filter(isDueSoon)
     if (statusFilter === 'overdue') return sorted.filter(isOverdue)
     if (statusFilter === 'pending')
       return sorted.filter((r) => r.status === 'pending' && !isOverdue(r))
@@ -391,9 +407,10 @@ function Inspections() {
         <Select
           value={statusFilter}
           onChange={setStatusFilter}
-          style={{ width: 200 }}
+          style={{ width: 220 }}
           options={[
             { value: 'all', label: 'Tất cả' },
+            { value: 'due', label: 'Sắp / đã hết hạn tem' },
             { value: 'awaiting_confirmation', label: 'Chờ xác nhận' },
             { value: 'overdue', label: 'Quá hạn tem' },
             { value: 'pending', label: 'Chờ tới hạn' },

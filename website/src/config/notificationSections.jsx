@@ -28,7 +28,7 @@ export const NOTIFICATION_SECTIONS = [
     color: '#d97706',
     bg: '#fffbeb',
     label: 'Bảo trì sắp tới hạn',
-    path: '/maintenance',
+    path: '/maintenance?status=due',
     icon: <ToolOutlined />,
     describe: (item) => {
       const when = item.scheduled_date
@@ -42,7 +42,7 @@ export const NOTIFICATION_SECTIONS = [
     color: '#0d9488',
     bg: '#f0fdfa',
     label: 'Đăng kiểm sắp tới hạn',
-    path: '/inspections',
+    path: '/inspections?status=due',
     icon: <SafetyCertificateOutlined />,
     describe: (item) =>
       item.old_sticker_expiry
