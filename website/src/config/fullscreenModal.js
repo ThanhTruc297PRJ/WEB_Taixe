@@ -1,28 +1,25 @@
-// Popup thêm/sửa có form dài (bảo trì, đăng kiểm) mở toàn màn hình — popup nhỏ
-// phải cuộn trong khung, khó nhìn. Dùng: <Modal width="100vw" {...FULLSCREEN_MODAL}>
-// và bọc form trong FULLSCREEN_FORM_STYLE để form không bị kéo dãn trên màn rộng.
-const CONTENT_WIDTH = 880
-
+// Popup thêm/sửa có form dài (bảo trì, đăng kiểm) mở cỡ lớn (~80% màn hình) —
+// popup mặc định quá nhỏ phải cuộn trong khung, toàn màn hình thì quá trống.
+// Dùng: <Modal width={FULLSCREEN_MODAL.width} style={FULLSCREEN_MODAL.style}
+// styles={FULLSCREEN_MODAL.styles}>. Form dài hơn khung thì cuộn bên trong,
+// nút Huỷ / Lưu luôn nằm ở đáy popup.
 export const FULLSCREEN_MODAL = {
-  style: { top: 0, maxWidth: '100vw', margin: 0, paddingBottom: 0 },
+  width: '80vw',
+  style: { top: '6vh', paddingBottom: 0 },
   styles: {
     container: {
-      minHeight: '100vh',
-      borderRadius: 0,
+      maxHeight: '86vh',
       display: 'flex',
       flexDirection: 'column',
-      padding: '20px 24px',
+      padding: '20px 28px',
     },
-    header: { maxWidth: CONTENT_WIDTH, width: '100%', margin: '0 auto 16px' },
-    body: { flex: 1, overflowY: 'auto' },
-    footer: { maxWidth: CONTENT_WIDTH, width: '100%', margin: '16px auto 0' },
+    header: { marginBottom: 16 },
+    body: { flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 },
+    footer: { marginTop: 16 },
   },
 }
 
-export const FULLSCREEN_FORM_STYLE = {
-  maxWidth: CONTENT_WIDTH,
-  margin: '0 auto',
-}
+export const FULLSCREEN_FORM_STYLE = {}
 
 // Class Tailwind "grid grid-cols-2" bị CSS của AntD đè trong Modal (render qua
 // Portal) nên form chỉ còn 1 cột -> dùng style inline; tự xuống 1 cột khi màn hẹp.

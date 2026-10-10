@@ -446,7 +446,7 @@ function Inspections() {
         onCancel={() => setModalOpen(false)}
         okText="Lưu"
         cancelText="Huỷ"
-        width="100vw"
+        width={FULLSCREEN_MODAL.width}
         style={FULLSCREEN_MODAL.style}
         styles={FULLSCREEN_MODAL.styles}
         destroyOnHidden
