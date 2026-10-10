@@ -58,6 +58,8 @@ function collectIds(data) {
 export function useAdminNotifications(refreshSignal) {
   const [data, setData] = useState(EMPTY_DATA)
   const [error, setError] = useState(null)
+  // true tới khi tải xong lần đầu (thành công hay lỗi) — để UI hiện vòng xoay.
+  const [loading, setLoading] = useState(true)
   const [seen, setSeen] = useState(loadSeen)
   const mountedRef = useRef(true)
 
@@ -73,6 +75,8 @@ export function useAdminNotifications(refreshSignal) {
       // "thật sự không có gì" — nếu không, một lỗi gọi API (backend chưa
       // restart, mất mạng...) trông giống hệt trạng thái rỗng bình thường.
       if (mountedRef.current) setError(e?.message || 'Không tải được thông báo')
+    } finally {
+      if (mountedRef.current) setLoading(false)
     }
   }, [])
 
@@ -108,5 +112,5 @@ export function useAdminNotifications(refreshSignal) {
     currentIds.some((id) => !seenIdSet.has(id)) || data.total > seen.total
   const unseenCount = hasNewSinceSeen ? data.total : 0
 
-  return { data, error, refresh, unseenCount, markSeen, seenIds: seen.ids }
+  return { data, error, loading, refresh, unseenCount, markSeen, seenIds: seen.ids }
 }

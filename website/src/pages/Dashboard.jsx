@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Card, Col, Row, Button, Empty, Badge, Popover } from 'antd'
+import { Card, Col, Row, Button, Empty, Badge, Popover, Spin } from 'antd'
 import {
   TeamOutlined,
   CarOutlined,
@@ -66,7 +66,17 @@ function HeroStatPopover({ items, emptyText }) {
   )
 }
 
-function HeroStatCard({ icon, label, value, trend, tone = 'blue', onClick, items, emptyText }) {
+function HeroStatCard({
+  icon,
+  label,
+  value,
+  trend,
+  tone = 'blue',
+  onClick,
+  items,
+  emptyText,
+  loading = false,
+}) {
   const card = (
     <Card
       hoverable={!!onClick}
@@ -84,8 +94,15 @@ function HeroStatCard({ icon, label, value, trend, tone = 'blue', onClick, items
           {icon}
         </span>
       </div>
-      <div className="mt-2 text-2xl font-bold text-slate-800">{value}</div>
-      {trend && (
+      {loading ? (
+        <div className="mt-3 flex items-center gap-3 text-sm text-slate-400">
+          <Spin size="small" />
+          Đang tải dữ liệu…
+        </div>
+      ) : (
+        <div className="mt-2 text-2xl font-bold text-slate-800">{value}</div>
+      )}
+      {!loading && trend && (
         <div className="mt-1 flex items-center gap-1 text-xs text-slate-500">
           <RiseOutlined className="text-emerald-500" />
           {trend}
@@ -94,7 +111,7 @@ function HeroStatCard({ icon, label, value, trend, tone = 'blue', onClick, items
     </Card>
   )
 
-  if (!items) return card
+  if (!items || loading) return card
 
   return (
     <Popover
@@ -108,12 +125,17 @@ function HeroStatCard({ icon, label, value, trend, tone = 'blue', onClick, items
   )
 }
 
-function AttentionSection({ data, navigate }) {
+function AttentionSection({ data, navigate, loading }) {
   const active = NOTIFICATION_SECTIONS.filter((s) => (data[s.key]?.count ?? 0) > 0)
 
   return (
     <Card className="mt-4" title="Việc cần chú ý">
-      {active.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center gap-3 py-8 text-sm text-slate-400">
+          <Spin />
+          Đang tải dữ liệu…
+        </div>
+      ) : active.length === 0 ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có gì cần chú ý" />
       ) : (
         <Row gutter={[16, 16]}>
@@ -168,9 +190,11 @@ function AttentionSection({ data, navigate }) {
 function Dashboard() {
   const navigate = useNavigate()
   const { drivers, loading } = useDrivers()
-  const { data: attention } = useAdminNotifications()
+  const { data: attention, loading: attentionLoading } = useAdminNotifications()
   const [vehicles, setVehicles] = useState([])
   const [incidents, setIncidents] = useState([])
+  const [vehiclesLoading, setVehiclesLoading] = useState(true)
+  const [incidentsLoading, setIncidentsLoading] = useState(true)
 
   useEffect(() => {
     listVehicles()
@@ -178,11 +202,13 @@ function Dashboard() {
       .catch(() => {
         /* thẻ số liệu xe chỉ hiện — không chặn phần còn lại của dashboard */
       })
+      .finally(() => setVehiclesLoading(false))
     listIncidents()
       .then(setIncidents)
       .catch(() => {
         /* biểu đồ sự cố chỉ hiện rỗng — không chặn phần còn lại của dashboard */
       })
+      .finally(() => setIncidentsLoading(false))
   }, [])
 
   const driverStats = useMemo(() => {
@@ -342,7 +368,8 @@ function Dashboard() {
           <HeroStatCard
             icon={<TeamOutlined />}
             label="Tài xế trực tuyến"
-            value={loading ? '—' : `${driverStats.online} / ${driverStats.total}`}
+            loading={loading}
+            value={`${driverStats.online} / ${driverStats.total}`}
             trend={
               driverStats.total
                 ? `${Math.round((driverStats.online / driverStats.total) * 100)}% đang kết nối app`
@@ -358,6 +385,7 @@ function Dashboard() {
           <HeroStatCard
             icon={<CarOutlined />}
             label="Xe đang lưu thông"
+            loading={loading || vehiclesLoading}
             value={`${driverStats.drivingCount} / ${vehicles.length || '—'}`}
             trend={
               driverStats.avgSpeed != null
@@ -374,6 +402,7 @@ function Dashboard() {
           <HeroStatCard
             icon={<WarningOutlined />}
             label="Cảnh báo buồn ngủ"
+            loading={incidentsLoading}
             value={`${todayIncidentStats.drowsy} vụ hôm nay`}
             trend={todayIncidentStats.peakText}
             tone="rose"
@@ -386,6 +415,7 @@ function Dashboard() {
           <HeroStatCard
             icon={<ToolOutlined />}
             label="Bảo trì"
+            loading={attentionLoading}
             value={`${maintenanceStats.count} lịch sắp đến hạn`}
             trend={
               maintenanceStats.nearest
@@ -395,7 +425,7 @@ function Dashboard() {
                   : 'Không có lịch nào sắp tới'
             }
             tone="amber"
-            onClick={() => navigate('/maintenance')}
+            onClick={() => navigate('/maintenance?status=due')}
             items={maintenanceStats.list}
             emptyText="Chưa có xe nào sắp tới hạn bảo trì"
           />
@@ -404,6 +434,7 @@ function Dashboard() {
           <HeroStatCard
             icon={<SafetyCertificateOutlined />}
             label="Đăng kiểm"
+            loading={attentionLoading}
             value={`${inspectionStats.count} xe sắp hết hạn`}
             trend={
               inspectionStats.nearest
@@ -411,16 +442,20 @@ function Dashboard() {
                 : 'Không có xe nào sắp hết hạn'
             }
             tone="teal"
-            onClick={() => navigate('/inspections')}
+            onClick={() => navigate('/inspections?status=due')}
             items={inspectionStats.list}
             emptyText="Chưa có xe nào sắp hết hạn đăng kiểm"
           />
         </Col>
       </Row>
 
-      <OverviewCharts incidents={incidents} drivers={drivers} />
+      <OverviewCharts
+        incidents={incidents}
+        drivers={drivers}
+        loading={loading || incidentsLoading}
+      />
 
-      <AttentionSection data={attention} navigate={navigate} />
+      <AttentionSection data={attention} navigate={navigate} loading={attentionLoading} />
 
       <Card
         className="mt-4"
