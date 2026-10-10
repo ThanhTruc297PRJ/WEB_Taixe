@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { App, Button, Card, Descriptions, Empty, Space, Table } from 'antd'
+import { Alert, App, Button, Card, DatePicker, Descriptions, Empty, Space, Table } from 'antd'
 import { DownloadOutlined, PrinterOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useSearchParams } from 'react-router-dom'
+import { inspectionCostDate, maintenanceCostDate } from '../utils/costDates'
 import PageHeader from '../components/PageHeader'
 import { PrintableReport, triggerPrint } from '../components/PrintableReport'
 import { listMaintenance } from '../services/maintenance'
@@ -11,8 +13,23 @@ import { exportCsv } from '../utils/csv'
 
 function CostReport() {
   const { message } = App.useApp()
-  const [maintenance, setMaintenance] = useState([])
-  const [inspections, setInspections] = useState([])
+  const [allMaintenance, setMaintenance] = useState([])
+  const [allInspections, setInspections] = useState([])
+  // ?month=2026-09 — mở từ biểu đồ chi phí ở Tổng quan (bấm vào cột tháng).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const month = searchParams.get('month')
+  const setMonth = (m) => setSearchParams(m ? { month: m } : {})
+  const inMonth = (date) => !month || (date && dayjs(date).format('YYYY-MM') === month)
+  const maintenance = useMemo(
+    () => allMaintenance.filter((m) => inMonth(maintenanceCostDate(m))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- inMonth chỉ phụ thuộc month
+    [allMaintenance, month],
+  )
+  const inspections = useMemo(
+    () => allInspections.filter((i) => inMonth(inspectionCostDate(i))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- inMonth chỉ phụ thuộc month
+    [allInspections, month],
+  )
   const [vehicles, setVehicles] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -66,14 +83,14 @@ function CostReport() {
       ...maintenance.map((m) => ({
         loai: 'Bảo trì',
         xe: vehiclePlate[m.vehicle_id] || m.vehicle_id,
-        ngay: m.scheduled_date ? dayjs(m.scheduled_date).format('DD/MM/YYYY') : '',
+        ngay: maintenanceCostDate(m) ? dayjs(maintenanceCostDate(m)).format('DD/MM/YYYY') : '',
         hangMuc: m.type || '',
         chiPhi: m.cost || 0,
       })),
       ...inspections.map((i) => ({
         loai: 'Đăng kiểm',
         xe: vehiclePlate[i.vehicle_id] || i.vehicle_id,
-        ngay: i.old_sticker_expiry ? dayjs(i.old_sticker_expiry).format('DD/MM/YYYY') : '',
+        ngay: inspectionCostDate(i) ? dayjs(inspectionCostDate(i)).format('DD/MM/YYYY') : '',
         hangMuc: 'Phí kiểm định + phí đường bộ',
         chiPhi: (i.inspection_fee || 0) + (i.road_fee || 0),
       })),
@@ -104,7 +121,33 @@ function CostReport() {
       <PageHeader
         title="Báo cáo chi phí"
         subtitle="Tổng hợp chi phí bảo trì & đăng kiểm theo từng xe"
+        extra={
+          <DatePicker
+            picker="month"
+            format="MM/YYYY"
+            placeholder="Tất cả các tháng"
+            value={month ? dayjs(`${month}-01`) : null}
+            onChange={(d) => setMonth(d ? d.format('YYYY-MM') : null)}
+            allowClear
+          />
+        }
       />
+
+      {month && (
+        <Alert
+          className="mb-4"
+          type="info"
+          showIcon
+          closable
+          onClose={() => setMonth(null)}
+          message={
+            <>
+              Đang xem chi phí tháng <strong>{dayjs(`${month}-01`).format('MM/YYYY')}</strong>.{' '}
+              <a onClick={() => setMonth(null)}>Xem tất cả các tháng</a>
+            </>
+          }
+        />
+      )}
 
       <Card
         loading={loading}
@@ -122,7 +165,11 @@ function CostReport() {
         {!hasData ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="Chưa có dữ liệu chi phí bảo trì/đăng kiểm nào"
+            description={
+              month
+                ? 'Tháng này chưa có chi phí bảo trì/đăng kiểm nào'
+                : 'Chưa có dữ liệu chi phí bảo trì/đăng kiểm nào'
+            }
           />
         ) : (
           <>

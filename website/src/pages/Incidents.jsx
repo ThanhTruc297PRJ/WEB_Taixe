@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   App,
   Button,
@@ -132,8 +133,25 @@ function Incidents() {
   const { drivers } = useDrivers()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
-  const [driverFilter, setDriverFilter] = useState('all')
-  const [typeFilter, setTypeFilter] = useState('all')
+  const [searchParams, setSearchParams] = useSearchParams()
+  // Bộ lọc nằm trên đường dẫn (?x=...) để biểu đồ ở trang Tổng quan mở thẳng
+  // đúng danh sách đã lọc.
+  const setParam = (key, value) =>
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value === undefined || value === null || value === '' || value === 'all')
+        next.delete(key)
+      else next.set(key, String(value))
+      return next
+    })
+  const driverFilter = searchParams.get('driver') || 'all'
+  const typeFilter = searchParams.get('type') || 'all'
+  const daysFilter = searchParams.get('days') || 'all'
+  const hourParam = searchParams.get('hour')
+  const hourFilter = hourParam == null ? null : Number(hourParam)
+  const setDriverFilter = (v) => setParam('driver', v)
+  const setTypeFilter = (v) => setParam('type', v)
+  const setDaysFilter = (v) => setParam('days', v)
   const [selected, setSelected] = useState(null)
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS)
 
@@ -185,9 +203,16 @@ function Incidents() {
       rows.filter((r) => {
         if (driverFilter !== 'all' && r.driver_id !== driverFilter) return false
         if (typeFilter !== 'all' && r.type !== typeFilter) return false
+        if (daysFilter !== 'all' || hourFilter != null) {
+          const d = toDate(r.detected_at)
+          if (!d) return false
+          if (daysFilter !== 'all' && !dayjs(d).isAfter(dayjs().subtract(Number(daysFilter), 'day')))
+            return false
+          if (hourFilter != null && d.getHours() !== hourFilter) return false
+        }
         return true
       }),
-    [rows, driverFilter, typeFilter],
+    [rows, driverFilter, typeFilter, daysFilter, hourFilter],
   )
 
   const totalPoints = useMemo(
@@ -325,6 +350,36 @@ function Incidents() {
             { value: 'distraction', label: 'Mất tập trung' },
           ]}
         />
+        <Select
+          value={daysFilter}
+          onChange={setDaysFilter}
+          style={{ width: 170 }}
+          options={[
+            { value: 'all', label: 'Mọi thời gian' },
+            { value: '7', label: '7 ngày gần nhất' },
+            { value: '30', label: '30 ngày gần nhất' },
+            { value: '90', label: '90 ngày gần nhất' },
+          ]}
+        />
+        {hourFilter != null && (
+          <Tag
+            closable
+            color="blue"
+            onClose={(e) => {
+              e.preventDefault()
+              setParam('hour', null)
+            }}
+            style={{ padding: '4px 8px', fontSize: 13 }}
+          >
+            Khung giờ {String(hourFilter).padStart(2, '0')}:00 –{' '}
+            {String(hourFilter).padStart(2, '0')}:59
+          </Tag>
+        )}
+        {searchParams.toString() && (
+          <Button type="link" onClick={() => setSearchParams({})}>
+            Bỏ lọc
+          </Button>
+        )}
       </Space>
 
       <Table

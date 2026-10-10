@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Card, Empty } from 'antd'
+import { Card, Empty, Spin } from 'antd'
 
 import { INK } from '../config/chartPalette'
 
@@ -71,7 +71,28 @@ function TipLines({ title, rows }) {
   )
 }
 
-export function ChartCard({ title, subtitle, extra, children }) {
+/** Vòng xoay + chữ "Đang tải…" khi chưa nhận được dữ liệu từ máy chủ. */
+export function LoadingBlock({ height = 200, text = 'Đang tải dữ liệu…' }) {
+  return (
+    <div
+      style={{
+        minHeight: height,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        color: INK.secondary,
+        fontSize: 13,
+      }}
+    >
+      <Spin />
+      {text}
+    </div>
+  )
+}
+
+export function ChartCard({ title, subtitle, extra, loading, children }) {
   return (
     <Card
       className="h-full"
@@ -86,23 +107,38 @@ export function ChartCard({ title, subtitle, extra, children }) {
       }
       extra={extra}
     >
-      {children}
+      {loading ? <LoadingBlock /> : children}
     </Card>
   )
 }
 
-function Legend({ items, total }) {
+function Legend({ items, total, onItemClick }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
       {items.map((it) => (
         <div
           key={it.key}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}
+          role={onItemClick ? 'button' : undefined}
+          tabIndex={onItemClick ? 0 : undefined}
+          onClick={() => onItemClick?.(it)}
+          onKeyDown={(e) => e.key === 'Enter' && onItemClick?.(it)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 13,
+            cursor: onItemClick ? 'pointer' : 'default',
+          }}
         >
           <span
             style={{ width: 10, height: 10, borderRadius: 3, background: it.color, flexShrink: 0 }}
           />
-          <span style={{ color: INK.secondary, flex: 1, minWidth: 0 }}>{it.label}</span>
+          <span style={{ color: INK.secondary, flex: 1, minWidth: 0, lineHeight: 1.3 }}>
+            {it.label}
+            {it.hint && (
+              <span style={{ display: 'block', fontSize: 11, color: INK.muted }}>{it.hint}</span>
+            )}
+          </span>
           <span style={{ color: INK.primary, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
             {fmt(it.value)}
           </span>
@@ -206,7 +242,7 @@ export function DonutChart({ data, centerValue, centerLabel, emptyText, onSliceC
         </text>
       </svg>
       <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-        <Legend items={data} total={total} />
+        <Legend items={data} total={total} onItemClick={onSliceClick} />
       </div>
       {node}
     </div>
@@ -308,6 +344,7 @@ export function StackedColumns({
   tickEvery = 1,
   formatValue = fmt,
   emptyText,
+  onColumnClick,
 }) {
   const [wrapRef, width] = useWidth()
   const { boxRef, show, hide, node } = useHoverTip()
@@ -376,6 +413,8 @@ export function StackedColumns({
                 return (
                   <g
                     key={r.label}
+                    onClick={() => onColumnClick?.(r, i)}
+                    style={{ cursor: onColumnClick ? 'pointer' : 'default' }}
                     onMouseMove={(e) =>
                       show(
                         e,

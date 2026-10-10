@@ -8,8 +8,9 @@ import { getSettings } from '../services/settings'
 import { listMaintenance } from '../services/maintenance'
 import { listInspections } from '../services/inspections'
 import { toDate } from '../utils/firestore'
+import { inspectionCostDate, maintenanceCostDate } from '../utils/costDates'
+import { DEFAULT_THRESHOLDS, LEVEL_META, LEVELS, levelOf, levelRange, pointsByDriver } from '../utils/violationLevel'
 
-const DEFAULT_THRESHOLDS = { reminder: 10, warning: 22, suspend: 30 }
 const RANGES = [
   { value: 7, label: '7 ngày' },
   { value: 30, label: '30 ngày' },
@@ -39,12 +40,13 @@ const typeKey = (t) => (t === 'drowsiness' ? 'drowsiness' : 'distraction')
  * sự cố theo giờ, chi phí theo tháng. Bộ lọc thời gian áp cho 3 biểu đồ sự cố
  * (loại, top, theo giờ); mức vi phạm tính trên tổng điểm tích luỹ giống trang
  * Sự cố an toàn; chi phí luôn là 6 tháng gần nhất. */
-function OverviewCharts({ incidents, drivers }) {
+function OverviewCharts({ incidents, drivers, loading = false }) {
   const navigate = useNavigate()
   const [days, setDays] = useState(30)
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS)
   const [maintenance, setMaintenance] = useState([])
   const [inspections, setInspections] = useState([])
+  const [costLoading, setCostLoading] = useState(true)
 
   useEffect(() => {
     getSettings()
@@ -52,16 +54,10 @@ function OverviewCharts({ incidents, drivers }) {
       .catch(() => {
         /* giữ ngưỡng mặc định */
       })
-    listMaintenance()
-      .then(setMaintenance)
-      .catch(() => {
-        /* biểu đồ chi phí hiện rỗng */
-      })
-    listInspections()
-      .then(setInspections)
-      .catch(() => {
-        /* biểu đồ chi phí hiện rỗng */
-      })
+    Promise.allSettled([
+      listMaintenance().then(setMaintenance),
+      listInspections().then(setInspections),
+    ]).finally(() => setCostLoading(false)) // lỗi thì biểu đồ chi phí hiện rỗng
   }, [])
 
   const driverName = useMemo(() => {
@@ -72,26 +68,25 @@ function OverviewCharts({ incidents, drivers }) {
 
   // 1. Tài xế theo mức vi phạm (tổng điểm tích luỹ).
   const levels = useMemo(() => {
-    const points = {}
-    for (const i of incidents) {
-      if (!i.driver_id) continue
-      points[i.driver_id] = (points[i.driver_id] || 0) + (i.points ?? 0)
-    }
-    const active = drivers.filter((d) => (d.status ?? 'active') === 'active')
+    const points = pointsByDriver(incidents)
     const count = { normal: 0, reminder: 0, warning: 0, suspend: 0 }
-    for (const d of active) {
-      const p = points[d.id] || 0
-      if (p >= thresholds.suspend) count.suspend += 1
-      else if (p >= thresholds.warning) count.warning += 1
-      else if (p >= thresholds.reminder) count.reminder += 1
-      else count.normal += 1
+    for (const d of drivers) {
+      if ((d.status ?? 'active') !== 'active') continue
+      count[levelOf(points[d.id] || 0, thresholds)] += 1
     }
-    return [
-      { key: 'normal', label: `Bình thường (< ${thresholds.reminder} điểm)`, value: count.normal, color: STATUS.good },
-      { key: 'reminder', label: `Nhắc nhở (từ ${thresholds.reminder})`, value: count.reminder, color: STATUS.warning },
-      { key: 'warning', label: `Cảnh cáo (từ ${thresholds.warning})`, value: count.warning, color: STATUS.serious },
-      { key: 'suspend', label: `Đình chỉ (từ ${thresholds.suspend})`, value: count.suspend, color: STATUS.critical },
-    ]
+    const colors = {
+      normal: STATUS.good,
+      reminder: STATUS.warning,
+      warning: STATUS.serious,
+      suspend: STATUS.critical,
+    }
+    return LEVELS.map((key) => ({
+      key,
+      label: LEVEL_META[key].label,
+      hint: levelRange(key, thresholds),
+      value: count[key],
+      color: colors[key],
+    }))
   }, [incidents, drivers, thresholds])
 
   const inRange = useMemo(() => {
@@ -154,7 +149,14 @@ function OverviewCharts({ incidents, drivers }) {
     const start = dayjs().startOf('month').subtract(COST_MONTHS - 1, 'month')
     const rows = Array.from({ length: COST_MONTHS }, (_, i) => {
       const m = start.add(i, 'month')
-      return { label: m.format('MM/YY'), tipTitle: `Tháng ${m.format('MM/YYYY')}`, maintenance: 0, inspection: 0, road: 0 }
+      return {
+        label: m.format('MM/YY'),
+        month: m.format('YYYY-MM'),
+        tipTitle: `Tháng ${m.format('MM/YYYY')} — bấm để xem chi tiết`,
+        maintenance: 0,
+        inspection: 0,
+        road: 0,
+      }
     })
     const add = (date, key, amount) => {
       if (!date || !amount) return
@@ -162,10 +164,10 @@ function OverviewCharts({ incidents, drivers }) {
       if (idx >= 0 && idx < COST_MONTHS) rows[idx][key] += amount
     }
     for (const m of maintenance) {
-      add(toDate(m.confirmed_at) || toDate(m.scheduled_date), 'maintenance', m.cost || 0)
+      add(maintenanceCostDate(m), 'maintenance', m.cost || 0)
     }
     for (const i of inspections) {
-      const date = toDate(i.confirmed_at) || toDate(i.appointment_at) || toDate(i.old_sticker_expiry)
+      const date = inspectionCostDate(i)
       add(date, 'inspection', i.inspection_fee || 0)
       add(date, 'road', i.road_fee || 0)
     }
@@ -182,52 +184,54 @@ function OverviewCharts({ incidents, drivers }) {
       </div>
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={8}>
-          <ChartCard title="Tài xế theo mức vi phạm" subtitle="Theo tổng điểm tích luỹ">
+          <ChartCard title="Tài xế theo mức vi phạm" subtitle="Theo tổng điểm tích luỹ" loading={loading}>
             <DonutChart
               data={levels}
               centerLabel="tài xế"
               emptyText="Chưa có tài xế đang hoạt động"
-              onSliceClick={() => navigate('/incidents')}
+              onSliceClick={(d) => navigate(`/drivers?level=${d.key}`)}
             />
           </ChartCard>
         </Col>
         <Col xs={24} lg={8}>
-          <ChartCard title="Loại sự cố" subtitle={`${rangeLabel} gần nhất`}>
+          <ChartCard title="Loại sự cố" subtitle={`${rangeLabel} gần nhất`} loading={loading}>
             <DonutChart
               data={byType}
               centerLabel="sự cố"
               emptyText={`Không có sự cố trong ${rangeLabel} gần nhất`}
-              onSliceClick={() => navigate('/incidents')}
+              onSliceClick={(d) => navigate(`/incidents?type=${d.key}&days=${days}`)}
             />
           </ChartCard>
         </Col>
         <Col xs={24} lg={8}>
-          <ChartCard title="Top tài xế nhiều điểm vi phạm" subtitle={`${rangeLabel} gần nhất`}>
+          <ChartCard title="Top tài xế nhiều điểm vi phạm" subtitle={`${rangeLabel} gần nhất`} loading={loading}>
             <RankBars
               rows={topDrivers}
               unit="Điểm vi phạm"
               emptyText={`Không tài xế nào bị trừ điểm trong ${rangeLabel} gần nhất`}
-              onRowClick={() => navigate('/incidents')}
+              onRowClick={(r) => navigate(`/incidents?driver=${r.key}&days=${days}`)}
             />
           </ChartCard>
         </Col>
         <Col xs={24} xl={14}>
-          <ChartCard title="Sự cố theo giờ trong ngày" subtitle={`${rangeLabel} gần nhất — khung giờ dễ buồn ngủ`}>
+          <ChartCard title="Sự cố theo giờ trong ngày" subtitle={`${rangeLabel} gần nhất — khung giờ dễ buồn ngủ`} loading={loading}>
             <StackedColumns
               rows={byHour}
               series={INCIDENT_TYPES}
               tickEvery={3}
+              onColumnClick={(_, hour) => navigate(`/incidents?hour=${hour}&days=${days}`)}
               formatValue={(v) => Math.round(v).toLocaleString('vi-VN')}
               emptyText={`Không có sự cố trong ${rangeLabel} gần nhất`}
             />
           </ChartCard>
         </Col>
         <Col xs={24} xl={10}>
-          <ChartCard title="Chi phí bảo trì & đăng kiểm" subtitle={`${COST_MONTHS} tháng gần nhất`}>
+          <ChartCard title="Chi phí bảo trì & đăng kiểm" subtitle={`${COST_MONTHS} tháng gần nhất`} loading={costLoading}>
             <StackedColumns
               rows={costByMonth}
               series={COST_SERIES}
               formatValue={compactMoney}
+              onColumnClick={(row) => navigate(`/costs?month=${row.month}`)}
               emptyText="Chưa có chi phí nào trong 6 tháng gần nhất"
             />
           </ChartCard>

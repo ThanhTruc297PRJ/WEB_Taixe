@@ -18,7 +18,7 @@ import {
   Typography,
 } from 'antd'
 import { KeyOutlined, PlusOutlined, SoundOutlined, SyncOutlined } from '@ant-design/icons'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import PageHeader from '../components/PageHeader'
 import {
@@ -34,6 +34,9 @@ import {
   updateDriver,
 } from '../services/drivers'
 import { listVehicles } from '../services/vehicles'
+import { listIncidents } from '../services/incidents'
+import { getSettings } from '../services/settings'
+import { DEFAULT_THRESHOLDS, LEVEL_META, levelOf, levelRange, pointsByDriver } from '../utils/violationLevel'
 import { useDrivers } from '../contexts/useDrivers'
 import { toDate } from '../utils/firestore'
 import { initials, avatarColor } from '../utils/avatar'
@@ -82,7 +85,12 @@ function Drivers() {
   const [rejectTarget, setRejectTarget] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   const [vehicles, setVehicles] = useState([])
+  const [incidents, setIncidents] = useState([])
+  const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS)
   const [form] = Form.useForm()
+  // ?level=suspend… — mở từ biểu đồ "Tài xế theo mức vi phạm" ở Tổng quan.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const levelFilter = searchParams.get('level')
 
   useEffect(() => {
     if (!error) return
@@ -91,6 +99,21 @@ function Drivers() {
       .then(setFallback)
       .catch((e) => message.error(e.message))
   }, [error, message])
+
+  useEffect(() => {
+    listIncidents()
+      .then(setIncidents)
+      .catch(() => {
+        /* cột điểm vi phạm hiện 0 nếu tải sự cố lỗi */
+      })
+    getSettings()
+      .then((s) => s.violation_thresholds && setThresholds(s.violation_thresholds))
+      .catch(() => {
+        /* giữ ngưỡng mặc định */
+      })
+  }, [])
+
+  const driverPoints = useMemo(() => pointsByDriver(incidents), [incidents])
 
   useEffect(() => {
     listVehicles()
@@ -128,6 +151,11 @@ function Drivers() {
     const result = rows.filter((d) => {
       const status = d.status ?? 'active'
       if (statusFilter !== 'all' && status !== statusFilter) return false
+      if (levelFilter) {
+        // Giống biểu đồ: chỉ tính tài xế đang hoạt động.
+        if (status !== 'active') return false
+        if (levelOf(driverPoints[d.id] || 0, thresholds) !== levelFilter) return false
+      }
       if (!q) return true
       return [d.name, d.phone, d.license_number, d.email]
         .filter(Boolean)
@@ -140,7 +168,7 @@ function Drivers() {
       if (ap !== bp) return ap - bp
       return (a.name ?? '').localeCompare(b.name ?? '', 'vi')
     })
-  }, [rows, search, statusFilter])
+  }, [rows, search, statusFilter, levelFilter, driverPoints, thresholds])
 
   const openCreate = () => {
     setEditing(null)
@@ -336,6 +364,26 @@ function Drivers() {
       },
     },
     {
+      title: 'Điểm vi phạm',
+      key: 'points',
+      width: 150,
+      sorter: (a, b) => (driverPoints[a.id] || 0) - (driverPoints[b.id] || 0),
+      render: (_, record) => {
+        const p = driverPoints[record.id] || 0
+        const level = levelOf(p, thresholds)
+        return (
+          <span className="flex items-center gap-2">
+            <strong>{p}</strong>
+            {level !== 'normal' && (
+              <Tag color={LEVEL_META[level].color} bordered={false}>
+                {LEVEL_META[level].label}
+              </Tag>
+            )}
+          </span>
+        )
+      },
+    },
+    {
       title: 'Trạng thái',
       dataIndex: 'status',
       render: (value, record) => {
@@ -518,6 +566,23 @@ function Drivers() {
                 Xem ngay
               </Button>
             )
+          }
+        />
+      )}
+
+      {levelFilter && LEVEL_META[levelFilter] && (
+        <Alert
+          className="mb-4"
+          type="info"
+          showIcon
+          closable
+          onClose={() => setSearchParams({})}
+          message={
+            <>
+              Đang xem tài xế mức <strong>{LEVEL_META[levelFilter].label}</strong> (
+              {levelRange(levelFilter, thresholds)} tích luỹ): {filtered.length} người.{' '}
+              <a onClick={() => setSearchParams({})}>Xem tất cả tài xế</a>
+            </>
           }
         />
       )}
