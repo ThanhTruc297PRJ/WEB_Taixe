@@ -15,7 +15,11 @@ import PageHeader from '../components/PageHeader'
 import OverviewCharts from '../components/OverviewCharts'
 import { useDrivers } from '../contexts/useDrivers'
 import { useAdminNotifications } from '../hooks/useAdminNotifications'
-import { NOTIFICATION_SECTIONS } from '../config/notificationSections'
+import {
+  NOTIFICATION_SECTIONS,
+  itemPathOf,
+  sectionPath,
+} from '../config/notificationSections'
 import { listVehicles } from '../services/vehicles'
 import { listIncidents } from '../services/incidents'
 import { toDate } from '../utils/firestore'
@@ -146,7 +150,8 @@ function AttentionSection({ data, navigate, loading }) {
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => navigate(s.path)}
+                  onClick={() => navigate(sectionPath(s, section))}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(sectionPath(s, section))}
                   className="h-full cursor-pointer rounded-xl border border-slate-200 p-4 transition-colors hover:border-blue-300 hover:bg-blue-50/40"
                 >
                   <div className="mb-2 flex items-center gap-2">
@@ -168,7 +173,15 @@ function AttentionSection({ data, navigate, loading }) {
                         item.id
                       const desc = s.describe(item)
                       return (
-                        <div key={item.id} className="truncate text-xs text-slate-500">
+                        <div
+                          key={item.id}
+                          role="link"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(itemPathOf(s, item, section))
+                          }}
+                          className="truncate rounded px-1 -mx-1 text-xs text-slate-500 hover:bg-white hover:text-blue-600"
+                        >
                           {title}
                           {desc ? ` · ${desc}` : ''}
                         </div>

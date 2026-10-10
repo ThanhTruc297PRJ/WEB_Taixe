@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { App, Button, Card, Image, Segmented, Table, Tag } from 'antd'
 import { CheckOutlined, ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import { useDrivers } from '../contexts/useDrivers'
 import { listDriverReports, resolveDriverReport } from '../services/driverReports'
@@ -11,7 +12,9 @@ function DriverReports() {
   const { drivers } = useDrivers()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
-  const [filter, setFilter] = useState('new')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filter = searchParams.get('status') || 'new'
+  const setFilter = (value) => setSearchParams(value === 'new' ? {} : { status: value })
   const [resolvingId, setResolvingId] = useState(null)
 
   const load = useCallback(async () => {

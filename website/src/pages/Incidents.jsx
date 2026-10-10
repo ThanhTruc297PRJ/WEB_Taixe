@@ -152,7 +152,15 @@ function Incidents() {
   const setDriverFilter = (v) => setParam('driver', v)
   const setTypeFilter = (v) => setParam('type', v)
   const setDaysFilter = (v) => setParam('days', v)
-  const [selected, setSelected] = useState(null)
+  // ?incident=<id> (từ Tổng quan / chuông) mở thẳng chi tiết sự cố đó.
+  const [picked, setPicked] = useState(null)
+  const incidentParam = searchParams.get('incident')
+  const selected =
+    picked ?? (incidentParam ? rows.find((r) => r.id === incidentParam) ?? null : null)
+  const setSelected = (record) => {
+    setPicked(record)
+    if (!record && incidentParam) setParam('incident', null)
+  }
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS)
 
   useEffect(() => {

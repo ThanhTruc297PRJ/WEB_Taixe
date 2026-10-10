@@ -25,6 +25,7 @@ import {
   PauseCircleFilled,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
 import { useMusicRealtime } from '../hooks/useMusicRealtime'
@@ -37,7 +38,9 @@ function Music() {
   const { tracks: live, loading, error } = useMusicRealtime()
   const [fallback, setFallback] = useState(null)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filter = searchParams.get('filter') || 'all'
+  const setFilter = (value) => setSearchParams(value === 'all' ? {} : { filter: value })
   const [disableTarget, setDisableTarget] = useState(null)
   const [reason, setReason] = useState('')
   const [playingId, setPlayingId] = useState(null)

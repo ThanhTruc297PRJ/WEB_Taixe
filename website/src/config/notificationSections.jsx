@@ -12,13 +12,22 @@ import dayjs from 'dayjs'
 // Nguồn cấu hình DUY NHẤT cho các loại "việc cần chú ý" — dùng chung bởi chuông
 // thông báo (Header) và trang Tổng quan (Dashboard), tránh lặp code/định
 // nghĩa lệch nhau giữa 2 nơi hiển thị cùng 1 dữ liệu từ GET /admin/notifications/.
+/** Đường dẫn (đã lọc) của cả nhóm — `path` có thể là chuỗi hoặc hàm theo dữ liệu nhóm. */
+export const sectionPath = (s, section) =>
+  typeof s.path === 'function' ? s.path(section) : s.path
+
+/** Đường dẫn khi bấm 1 dòng trong nhóm. */
+export const itemPathOf = (s, item, section) =>
+  s.itemPath ? s.itemPath(item) : sectionPath(s, section)
+
 export const NOTIFICATION_SECTIONS = [
   {
     key: 'pending_drivers',
     color: '#2563eb',
     bg: '#eff6ff',
     label: 'Tài xế chờ duyệt',
-    path: '/drivers',
+    path: '/drivers?status=pending',
+    itemPath: () => '/drivers?status=pending',
     icon: <TeamOutlined />,
     describe: (item) =>
       item.email_verified ? 'Đã xác thực email — duyệt được ngay' : 'Chưa xác thực email',
@@ -29,6 +38,7 @@ export const NOTIFICATION_SECTIONS = [
     bg: '#fffbeb',
     label: 'Bảo trì sắp tới hạn',
     path: '/maintenance?status=due',
+    itemPath: () => '/maintenance?status=due',
     icon: <ToolOutlined />,
     describe: (item) => {
       const when = item.scheduled_date
@@ -43,6 +53,7 @@ export const NOTIFICATION_SECTIONS = [
     bg: '#f0fdfa',
     label: 'Đăng kiểm sắp tới hạn',
     path: '/inspections?status=due',
+    itemPath: () => '/inspections?status=due',
     icon: <SafetyCertificateOutlined />,
     describe: (item) =>
       item.old_sticker_expiry
@@ -54,7 +65,9 @@ export const NOTIFICATION_SECTIONS = [
     color: '#dc2626',
     bg: '#fef2f2',
     label: 'Sự cố an toàn gần đây',
-    path: '/incidents',
+    // Sự cố trong 24 giờ qua; bấm 1 dòng mở thẳng chi tiết sự cố đó.
+    path: '/incidents?days=1',
+    itemPath: (item) => `/incidents?days=1&incident=${item.id}`,
     icon: <WarningOutlined />,
     describe: (item) =>
       item.detected_at ? dayjs(item.detected_at).format('HH:mm DD/MM') : '',
@@ -64,7 +77,8 @@ export const NOTIFICATION_SECTIONS = [
     color: '#7c3aed',
     bg: '#f5f3ff',
     label: 'Báo cáo từ tài xế',
-    path: '/driver-reports',
+    path: '/driver-reports?status=new',
+    itemPath: () => '/driver-reports?status=new',
     icon: <MessageOutlined />,
     describe: (item) => {
       const when = item.created_at ? dayjs(item.created_at).format('HH:mm DD/MM') : ''
@@ -76,7 +90,11 @@ export const NOTIFICATION_SECTIONS = [
     color: '#9333ea',
     bg: '#faf5ff',
     label: 'Chờ xác nhận bảo trì / đăng kiểm',
-    path: '/maintenance?status=awaiting_confirmation',
+    // Nhóm gồm cả bảo trì lẫn đăng kiểm: chỉ có đăng kiểm thì mở trang Đăng kiểm.
+    path: (section) =>
+      section?.items?.length && section.items.every((i) => i.kind === 'inspection')
+        ? '/inspections?status=awaiting_confirmation'
+        : '/maintenance?status=awaiting_confirmation',
     itemPath: (item) =>
       `${item.kind === 'inspection' ? '/inspections' : '/maintenance'}?review=${item.id}`,
     icon: <AuditOutlined />,
@@ -90,7 +108,8 @@ export const NOTIFICATION_SECTIONS = [
     color: '#db2777',
     bg: '#fdf2f8',
     label: 'Bài hát bị báo cáo',
-    path: '/music',
+    path: '/music?filter=reported',
+    itemPath: () => '/music?filter=reported',
     icon: <CustomerServiceOutlined />,
     describe: (item) => {
       const count = item.report_count || 0

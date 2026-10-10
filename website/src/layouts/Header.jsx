@@ -5,7 +5,11 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import UserProfile from '../components/UserProfile'
 import { navTitle } from './navConfig'
 import { useAdminNotifications } from '../hooks/useAdminNotifications'
-import { NOTIFICATION_SECTIONS as SECTIONS } from '../config/notificationSections'
+import {
+  NOTIFICATION_SECTIONS as SECTIONS,
+  itemPathOf,
+  sectionPath,
+} from '../config/notificationSections'
 
 const { Header: AntHeader } = Layout
 
@@ -212,7 +216,7 @@ function NotificationPanel({ data, error, newIds, onNavigate }) {
                   <button
                     type="button"
                     style={styles.seeAll}
-                    onClick={() => onNavigate(s.path)}
+                    onClick={() => onNavigate(sectionPath(s, section))}
                   >
                     {more > 0 ? `Xem tất cả (${section.count})` : 'Mở trang'} →
                   </button>
@@ -223,7 +227,7 @@ function NotificationPanel({ data, error, newIds, onNavigate }) {
                     section={s}
                     item={item}
                     isNew={newIds.has(item.id)}
-                    onClick={() => onNavigate(s.itemPath ? s.itemPath(item) : s.path)}
+                    onClick={() => onNavigate(itemPathOf(s, item, section))}
                   />
                 ))}
               </div>

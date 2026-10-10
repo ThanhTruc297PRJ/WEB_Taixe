@@ -78,7 +78,6 @@ function Drivers() {
   const [fallback, setFallback] = useState(null)
   // Điền sẵn từ khoá khi điều hướng tới từ ô tìm nhanh trên Header.
   const [search, setSearch] = useState(location.state?.initialSearch || '')
-  const [statusFilter, setStatusFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -91,6 +90,14 @@ function Drivers() {
   // ?level=suspend… — mở từ biểu đồ "Tài xế theo mức vi phạm" ở Tổng quan.
   const [searchParams, setSearchParams] = useSearchParams()
   const levelFilter = searchParams.get('level')
+  const statusFilter = searchParams.get('status') || 'all'
+  const setStatusFilter = (value) =>
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value && value !== 'all') next.set('status', value)
+      else next.delete('status')
+      return next
+    })
 
   useEffect(() => {
     if (!error) return
