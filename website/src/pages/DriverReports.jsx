@@ -68,6 +68,12 @@ function DriverReports() {
 
   const columns = [
     {
+      title: 'STT',
+      key: 'stt',
+      width: 55,
+      render: (_, __, index) => index + 1,
+    },
+    {
       title: 'Thời gian',
       dataIndex: 'created_at',
       width: 160,

@@ -99,6 +99,7 @@ function CostReport() {
   )
 
   const reportColumns = [
+    { key: 'stt', label: 'STT', value: (_, i) => i + 1 },
     { key: 'loai', label: 'Loại', value: (r) => r.loai },
     { key: 'xe', label: 'Xe', value: (r) => r.xe },
     { key: 'ngay', label: 'Ngày', value: (r) => r.ngay },
@@ -195,6 +196,12 @@ function CostReport() {
               dataSource={byVehicle}
               pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
               columns={[
+                {
+                  title: 'STT',
+                  key: 'stt',
+                  width: 55,
+                  render: (_, __, index) => index + 1,
+                },
                 {
                   title: 'Xe',
                   dataIndex: 'vehicleId',

@@ -232,6 +232,7 @@ function KnowledgeBaseTab() {
 
   const columns = useMemo(
     () => [
+      { title: 'STT', key: 'stt', width: 55, render: (_, __, i) => i + 1 },
       { title: 'Tài liệu', dataIndex: 'title' },
       {
         title: 'Nhóm',
@@ -390,6 +391,7 @@ function ChatLogsTab() {
   }
 
   const columns = [
+    { title: 'STT', key: 'stt', width: 55, render: (_, __, i) => i + 1 },
     {
       title: 'Thời gian',
       dataIndex: 'created_at',
