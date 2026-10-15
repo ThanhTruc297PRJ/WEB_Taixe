@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   Card,
+  Dropdown,
   Form,
   Input,
   Modal,
@@ -17,7 +18,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
-import { KeyOutlined, PlusOutlined, SoundOutlined, SyncOutlined } from '@ant-design/icons'
+import { DownOutlined, KeyOutlined, PlusOutlined, SoundOutlined, SyncOutlined } from '@ant-design/icons'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import PageHeader from '../components/PageHeader'
@@ -314,11 +315,15 @@ function Drivers() {
           >
             {!record.photo_url && initials(name)}
           </Avatar>
-          <div className="leading-tight">
+          <div className="leading-tight min-w-0">
             <div className="font-medium text-slate-800">{name || '(chưa có tên)'}</div>
             {record.email && (
-              <div className="text-xs text-slate-400">{record.email}</div>
+              <div className="text-xs text-slate-400 truncate max-w-[180px]">{record.email}</div>
             )}
+            <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap gap-x-2">
+              {record.phone && <span>{record.phone}</span>}
+              {record.license_number && <span className="text-slate-400">{record.license_number}</span>}
+            </div>
             {record.status === 'pending' && (
               <Tag
                 bordered={false}
@@ -332,8 +337,6 @@ function Drivers() {
         </div>
       ),
     },
-    { title: 'Số điện thoại', dataIndex: 'phone', render: (v) => v || '—' },
-    { title: 'Số bằng lái', dataIndex: 'license_number', render: (v) => v || '—' },
     {
       title: 'Xe phụ trách',
       key: 'vehicles',
@@ -417,111 +420,66 @@ function Drivers() {
     {
       title: '',
       key: 'actions',
-      width: 270,
+      width: 180,
       align: 'right',
       render: (_, record) => {
         const st = record.status ?? 'active'
         if (st === 'pending') {
           const verified = !!record.email_verified
-          const approveBtn = (
-            <Popconfirm
-              title="Duyệt tài khoản này?"
-              okText="Duyệt"
-              cancelText="Huỷ"
-              onConfirm={() => handleApprove(record.id)}
-            >
-              <Tooltip title={!verified ? 'Email chưa xác thực theo cache — backend sẽ kiểm tra lại khi duyệt' : ''}>
-                <Button size="small" type="primary">
-                  Duyệt
-                </Button>
-              </Tooltip>
-            </Popconfirm>
-          )
           return (
-            <Space>
-              {approveBtn}
-              <Button
-                size="small"
-                danger
-                onClick={() => {
-                  setRejectTarget(record)
-                  setRejectReason('')
-                }}
-              >
+            <Space size={4}>
+              <Popconfirm title="Duyệt tài khoản này?" okText="Duyệt" cancelText="Huỷ" onConfirm={() => handleApprove(record.id)}>
+                <Tooltip title={!verified ? 'Email chưa xác thực — backend sẽ kiểm tra lại khi duyệt' : ''}>
+                  <Button size="small" type="primary">Duyệt</Button>
+                </Tooltip>
+              </Popconfirm>
+              <Button size="small" danger onClick={() => { setRejectTarget(record); setRejectReason('') }}>
                 Từ chối
               </Button>
             </Space>
           )
         }
         if (st === 'active') {
+          const moreItems = {
+            items: [
+              { key: 'reset', icon: <KeyOutlined />, label: 'Đặt lại mật khẩu', onClick: () => handleResetPassword(record) },
+              { key: 'sound', icon: <SoundOutlined />, label: 'Phát loa cảnh báo', onClick: () => handleAlertSound(record) },
+            ],
+          }
           return (
-            <Space>
-              <Button size="small" onClick={() => openEdit(record)}>
-                Sửa
-              </Button>
-              <Tooltip title="Đặt lại mật khẩu">
-                <Button
-                  size="small"
-                  icon={<KeyOutlined />}
-                  onClick={() => handleResetPassword(record)}
-                />
-              </Tooltip>
-              <Tooltip title="Phát loa cảnh báo tới tài xế">
-                <Button
-                  size="small"
-                  icon={<SoundOutlined />}
-                  onClick={() => handleAlertSound(record)}
-                />
-              </Tooltip>
-              <Popconfirm
-                title="Khoá tài khoản này?"
-                okText="Khoá"
-                cancelText="Huỷ"
-                onConfirm={() => handleLock(record.id)}
-              >
-                <Button size="small" danger>
-                  Khoá
-                </Button>
+            <Space size={4}>
+              <Button size="small" onClick={() => openEdit(record)}>Sửa</Button>
+              <Popconfirm title="Khoá tài khoản này?" okText="Khoá" cancelText="Huỷ" onConfirm={() => handleLock(record.id)}>
+                <Button size="small" danger>Khoá</Button>
               </Popconfirm>
+              <Dropdown menu={moreItems} trigger={['click']}>
+                <Button size="small" icon={<DownOutlined />} />
+              </Dropdown>
             </Space>
           )
         }
         if (st === 'inactive') {
+          const moreItems = {
+            items: [
+              { key: 'reset', icon: <KeyOutlined />, label: 'Đặt lại mật khẩu', onClick: () => handleResetPassword(record) },
+              {
+                key: 'del', label: 'Xoá tài xế', danger: true,
+                onClick: () => handleDelete(record.id),
+              },
+            ],
+          }
           return (
-            <Space>
-              <Button size="small" type="primary" onClick={() => handleUnlock(record.id)}>
-                Mở khoá
-              </Button>
-              <Tooltip title="Đặt lại mật khẩu">
-                <Button
-                  size="small"
-                  icon={<KeyOutlined />}
-                  onClick={() => handleResetPassword(record)}
-                />
-              </Tooltip>
-              <Popconfirm
-                title="Xoá tài xế này?"
-                okText="Xoá"
-                cancelText="Huỷ"
-                onConfirm={() => handleDelete(record.id)}
-              >
-                <Button size="small" danger>
-                  Xoá
-                </Button>
-              </Popconfirm>
+            <Space size={4}>
+              <Button size="small" type="primary" onClick={() => handleUnlock(record.id)}>Mở khoá</Button>
+              <Dropdown menu={moreItems} trigger={['click']}>
+                <Button size="small" icon={<DownOutlined />} />
+              </Dropdown>
             </Space>
           )
         }
         return (
-          <Popconfirm
-            title="Xoá hồ sơ này?"
-            okText="Xoá"
-            cancelText="Huỷ"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button size="small" danger>
-              Xoá
-            </Button>
+          <Popconfirm title="Xoá hồ sơ này?" okText="Xoá" cancelText="Huỷ" onConfirm={() => handleDelete(record.id)}>
+            <Button size="small" danger>Xoá</Button>
           </Popconfirm>
         )
       },
@@ -622,7 +580,6 @@ function Drivers() {
           loading={loading && !error}
           columns={columns}
           dataSource={filtered}
-          scroll={{ x: 'max-content' }}
           pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
         />
       </Card>
