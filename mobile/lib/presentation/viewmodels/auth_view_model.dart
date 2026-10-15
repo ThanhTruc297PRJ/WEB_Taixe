@@ -38,6 +38,8 @@ class AuthViewModel extends ChangeNotifier {
   /// Lỗi thao tác gần nhất (sai mật khẩu, email đã dùng...) — cho form hiển thị.
   String? actionError;
   bool busy = false;
+  // Cờ ngăn _onAuthChanged kích refreshAccount / signOut khi đang trong signUpAndRegister.
+  bool _registering = false; // ignore: prefer_final_fields
 
   Future<void> _onAuthChanged(User? user) async {
     if (user == null) {
@@ -45,6 +47,7 @@ class AuthViewModel extends ChangeNotifier {
       _set(GateState.login);
       return;
     }
+    if (_registering) return;
     await refreshAccount();
   }
 
@@ -61,8 +64,9 @@ class AuthViewModel extends ChangeNotifier {
       account = await _driverApi.me(forceRefresh: force);
       _set(_gateFor(account));
     } on ApiException catch (e) {
-      if (e.statusCode == 401) {
+      if (e.statusCode == 401 && !_registering) {
         // Token hỏng / tài khoản đã xoá -> đăng nhập lại.
+        // Không signOut khi đang giữa luồng đăng ký để tránh mất token.
         await _auth.signOut();
       } else {
         actionError = e.message;
@@ -112,29 +116,21 @@ class AuthViewModel extends ChangeNotifier {
     required String name,
     required String phone,
     required String licenseNumber,
-  }) =>
-      _run(() async {
+  }) {
+    _registering = true;
+    return _run(() async {
+      try {
         try {
           await _auth.signUp(email, password);
         } on FirebaseAuthException catch (e) {
           if (e.code == 'email-already-in-use') {
-            // Tài khoản Firebase đã có (đăng ký bị gián đoạn trước đó) →
-            // đăng nhập để tiếp tục. Nếu sai mật khẩu → ném lại lỗi bình
-            // thường ("Email hoặc mật khẩu không đúng").
             await _auth.signIn(email, password);
-            // Nếu hồ sơ đã tồn tại (pending/active) → không đăng ký lại,
-            // chỉ cập nhật gate và thoát.
-            final existing = await _driverApi.me();
-            if (existing != null) {
-              await refreshAccount();
-              return;
-            }
-            // Hồ sơ chưa có → tiếp tục gửi hồ sơ bên dưới.
+            final existing = await _driverApi.me(forceRefresh: true);
+            if (existing != null) return;
           } else {
             rethrow;
           }
         }
-        // Gửi email xác thực (bỏ qua lỗi nếu đã gửi rồi).
         try {
           await _auth.sendEmailVerification();
         } catch (_) {}
@@ -143,8 +139,12 @@ class AuthViewModel extends ChangeNotifier {
           phone: phone,
           licenseNumber: licenseNumber,
         );
-        await refreshAccount();
-      });
+      } finally {
+        _registering = false;
+      }
+      await refreshAccount();
+    });
+  }
 
   /// Gửi lại email xác thực (màn "Chưa xác thực email" gọi khi tài xế bấm
   /// "Gửi lại"). Firebase tự giới hạn tần suất gọi liên tục.
