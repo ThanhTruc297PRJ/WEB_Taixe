@@ -301,6 +301,7 @@ function KnowledgeBaseTab() {
           loading={loading}
           columns={columns}
           dataSource={docs}
+          scroll={{ x: 'max-content' }}
           pagination={false}
           locale={{ emptyText: 'Chưa có tài liệu nào' }}
         />
@@ -462,6 +463,7 @@ function ChatLogsTab() {
         loading={loading}
         columns={columns}
         dataSource={logs}
+        scroll={{ x: 'max-content' }}
         pagination={{ pageSize: 15, showSizeChanger: false, hideOnSinglePage: true }}
         locale={{ emptyText: 'Chưa có phiên trò chuyện nào' }}
       />

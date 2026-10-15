@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
-import { App, Button, Layout, Space, Spin } from 'antd'
+import { App, Button, Grid, Layout, Space, Spin } from 'antd'
 import {
   AuditOutlined,
   MessageOutlined,
@@ -24,7 +24,10 @@ const SEVERITY_TEXT = {
 }
 
 function DashboardLayout() {
+  const screens = Grid.useBreakpoint()
+  const isMobile = !screens.lg
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [notificationsRefreshSignal, setNotificationsRefreshSignal] = useState(0)
   const { notification, message } = App.useApp()
   const navigate = useNavigate()
@@ -159,15 +162,20 @@ function DashboardLayout() {
   return (
     <DriversProvider>
       <Layout className="min-h-screen">
-        <Sidebar collapsed={collapsed} />
+        <Sidebar
+          collapsed={collapsed}
+          isMobile={isMobile}
+          mobileOpen={mobileOpen}
+          onMobileClose={() => setMobileOpen(false)}
+        />
         <Layout>
           <Header
             collapsed={collapsed}
-            onToggle={() => setCollapsed((prev) => !prev)}
+            onToggle={() => isMobile ? setMobileOpen((prev) => !prev) : setCollapsed((prev) => !prev)}
             wsConnected={connected}
             notificationsRefreshSignal={notificationsRefreshSignal}
           />
-          <Content className="p-6">
+          <Content className="p-3 sm:p-4 lg:p-6">
             <div className="mx-auto max-w-[1280px]">
               <Suspense
                 fallback={

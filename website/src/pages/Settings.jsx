@@ -252,6 +252,7 @@ function AdminsTab() {
         rowKey="uid"
         loading={loading}
         dataSource={admins}
+        scroll={{ x: 'max-content' }}
         pagination={false}
         columns={[
           { title: 'Email', dataIndex: 'email' },

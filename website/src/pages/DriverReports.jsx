@@ -190,6 +190,7 @@ function DriverReports() {
           columns={columns}
           dataSource={filtered}
           locale={{ emptyText: 'Chưa có báo cáo nào' }}
+          scroll={{ x: 'max-content' }}
           pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
         />
       </Card>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Avatar, Badge, Layout, Menu, Tooltip } from 'antd'
+import { Badge, Drawer, Layout, Menu } from 'antd'
 import { SafetyCertificateFilled } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useDrivers } from '../contexts/useDrivers'
@@ -46,7 +46,7 @@ function badgeFor({ key, driversTotal, pendingCount, attention, vehicleCount }) 
   }
 }
 
-function Sidebar({ collapsed }) {
+function Sidebar({ collapsed, isMobile, mobileOpen, onMobileClose }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { drivers, pendingCount } = useDrivers()
@@ -98,31 +98,49 @@ function Sidebar({ collapsed }) {
 
   const displayLabel = user?.displayName || user?.email || 'Admin'
 
+  const sidebarContent = (showFull = true) => (
+    <div className="flex h-full flex-col" style={{ background: '#001529' }}>
+      <div className="flex h-[60px] shrink-0 items-center gap-2.5 px-4 text-white">
+        <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-lg">
+          <SafetyCertificateFilled />
+          <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#001529] bg-emerald-400" />
+        </span>
+        {showFull && (
+          <div className="overflow-hidden whitespace-nowrap leading-tight">
+            <div className="text-[15px] font-bold">DriverMonitor</div>
+            <div className="text-[10px] tracking-wide text-slate-400">Bảng điều khiển</div>
+          </div>
+        )}
+      </div>
+      <div className="mx-3 mb-2 border-t border-white/10" />
+      <Menu
+        theme="dark"
+        mode="inline"
+        selectedKeys={[location.pathname]}
+        items={menuItems}
+        onClick={({ key }) => { navigate(key); if (isMobile) onMobileClose?.() }}
+        style={{ background: 'transparent', borderInlineEnd: 'none', flex: 1, overflowY: 'auto' }}
+      />
+    </div>
+  )
+
+  if (isMobile) {
+    return (
+      <Drawer
+        placement="left"
+        open={mobileOpen}
+        onClose={onMobileClose}
+        width={256}
+        styles={{ body: { padding: 0, background: '#001529' }, header: { display: 'none' } }}
+      >
+        {sidebarContent(true)}
+      </Drawer>
+    )
+  }
+
   return (
     <Sider trigger={null} collapsible collapsed={collapsed} width={256} collapsedWidth={72}>
-      <div className="flex h-full flex-col">
-        <div className="flex h-[60px] shrink-0 items-center gap-2.5 px-4 text-white">
-          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-lg">
-            <SafetyCertificateFilled />
-            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#001529] bg-emerald-400" />
-          </span>
-          {!collapsed && (
-            <div className="overflow-hidden whitespace-nowrap leading-tight">
-              <div className="text-[15px] font-bold">DriverMonitor</div>
-              <div className="text-[10px] tracking-wide text-slate-400">Bảng điều khiển</div>
-            </div>
-          )}
-        </div>
-        <div className="mx-3 mb-2 border-t border-white/10" />
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={({ key }) => navigate(key)}
-          style={{ background: 'transparent', borderInlineEnd: 'none', flex: 1, overflowY: 'auto' }}
-        />
-      </div>
+      {sidebarContent(!collapsed)}
     </Sider>
   )
 }

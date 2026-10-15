@@ -415,6 +415,7 @@ function Incidents() {
         loading={loading}
         columns={columns}
         dataSource={filtered}
+        scroll={{ x: 'max-content' }}
         pagination={{ pageSize: 10, showSizeChanger: false }}
       />
 

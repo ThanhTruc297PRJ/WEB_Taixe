@@ -622,6 +622,7 @@ function Drivers() {
           loading={loading && !error}
           columns={columns}
           dataSource={filtered}
+          scroll={{ x: 'max-content' }}
           pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
         />
       </Card>
