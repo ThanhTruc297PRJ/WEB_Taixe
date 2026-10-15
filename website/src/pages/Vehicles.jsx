@@ -9,6 +9,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Pagination,
   Popconfirm,
   Row,
   Select,
@@ -51,6 +52,8 @@ function Vehicles() {
   const [search, setSearch] = useState(location.state?.initialSearch || '')
   const [statusFilter, setStatusFilter] = useState('all')
   const [driverFilter, setDriverFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 12
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -99,6 +102,7 @@ function Vehicles() {
   }, [maintenance])
 
   const filtered = useMemo(() => {
+    setPage(1)
     const q = search.trim().toLowerCase()
     return rows.filter((v) => {
       const status = v.status ?? 'active'
@@ -217,13 +221,14 @@ function Vehicles() {
         />
       </Space>
 
+      <div style={{ minHeight: 700 }}>
       {!loading && filtered.length === 0 ? (
         <Card>
           <Empty description="Không tìm thấy xe nào" />
         </Card>
       ) : (
         <Row gutter={[16, 16]}>
-          {filtered.map((record) => {
+          {filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((record) => {
             const status = record.status ?? 'active'
             const nextMaintenance = nextMaintenanceByVehicle[record.id]
             const dueSoon =
@@ -301,6 +306,19 @@ function Vehicles() {
             )
           })}
         </Row>
+      )}
+      </div>
+
+      {filtered.length > PAGE_SIZE && (
+        <div className="mt-6 flex justify-center">
+          <Pagination
+            current={page}
+            pageSize={PAGE_SIZE}
+            total={filtered.length}
+            onChange={setPage}
+            showTotal={(total) => `${total} xe`}
+          />
+        </div>
       )}
 
       <Modal

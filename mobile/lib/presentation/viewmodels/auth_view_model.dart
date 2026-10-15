@@ -103,6 +103,9 @@ class AuthViewModel extends ChangeNotifier {
       });
 
   /// Đăng ký mới: tạo tài khoản Firebase + gửi email xác thực + gửi hồ sơ.
+  /// Nếu tài khoản Firebase đã tồn tại (đăng ký trước bị gián đoạn giữa
+  /// chừng do mất mạng) → tự đăng nhập bằng email/mật khẩu vừa nhập rồi
+  /// tiếp tục gửi hồ sơ nếu chưa có, thay vì báo lỗi "đã đăng ký".
   Future<bool> signUpAndRegister({
     required String email,
     required String password,
@@ -111,10 +114,30 @@ class AuthViewModel extends ChangeNotifier {
     required String licenseNumber,
   }) =>
       _run(() async {
-        await _auth.signUp(email, password);
-        // Firebase tự gửi email kèm link xác thực — miễn phí, không cần
-        // backend. Tài xế phải bấm link này trước khi admin duyệt được.
-        await _auth.sendEmailVerification();
+        try {
+          await _auth.signUp(email, password);
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'email-already-in-use') {
+            // Tài khoản Firebase đã có (đăng ký bị gián đoạn trước đó) →
+            // đăng nhập để tiếp tục. Nếu sai mật khẩu → ném lại lỗi bình
+            // thường ("Email hoặc mật khẩu không đúng").
+            await _auth.signIn(email, password);
+            // Nếu hồ sơ đã tồn tại (pending/active) → không đăng ký lại,
+            // chỉ cập nhật gate và thoát.
+            final existing = await _driverApi.me();
+            if (existing != null) {
+              await refreshAccount();
+              return;
+            }
+            // Hồ sơ chưa có → tiếp tục gửi hồ sơ bên dưới.
+          } else {
+            rethrow;
+          }
+        }
+        // Gửi email xác thực (bỏ qua lỗi nếu đã gửi rồi).
+        try {
+          await _auth.sendEmailVerification();
+        } catch (_) {}
         await _driverApi.register(
           name: name,
           phone: phone,

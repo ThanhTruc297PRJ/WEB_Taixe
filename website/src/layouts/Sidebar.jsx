@@ -122,29 +122,6 @@ function Sidebar({ collapsed }) {
           onClick={({ key }) => navigate(key)}
           style={{ background: 'transparent', borderInlineEnd: 'none', flex: 1, overflowY: 'auto' }}
         />
-        <div className="mx-3 mt-2 border-t border-white/10" />
-        <div className="shrink-0 p-3">
-          <Tooltip title={collapsed ? `${displayLabel} · ${user?.email ?? ''}` : ''} placement="right">
-            <div className="flex items-center gap-2.5 rounded-lg bg-white/5 p-2">
-              <Avatar
-                size={32}
-                src={user?.photoURL || undefined}
-                style={user?.photoURL ? undefined : { backgroundColor: avatarColor(user?.email) }}
-              >
-                {!user?.photoURL && initials(displayLabel)}
-              </Avatar>
-              {!collapsed && (
-                <div className="min-w-0 flex-1 leading-tight">
-                  <div className="truncate text-xs font-medium text-white">{displayLabel}</div>
-                  <div className="truncate text-[10px] text-slate-400">{user?.email}</div>
-                </div>
-              )}
-              {!collapsed && (
-                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
-              )}
-            </div>
-          </Tooltip>
-        </div>
       </div>
     </Sider>
   )

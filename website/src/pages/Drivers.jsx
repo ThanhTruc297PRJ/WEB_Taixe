@@ -424,26 +424,22 @@ function Drivers() {
         if (st === 'pending') {
           const verified = !!record.email_verified
           const approveBtn = (
-            <Button size="small" type="primary" disabled={!verified}>
-              Duyệt
-            </Button>
+            <Popconfirm
+              title="Duyệt tài khoản này?"
+              okText="Duyệt"
+              cancelText="Huỷ"
+              onConfirm={() => handleApprove(record.id)}
+            >
+              <Tooltip title={!verified ? 'Email chưa xác thực theo cache — backend sẽ kiểm tra lại khi duyệt' : ''}>
+                <Button size="small" type="primary">
+                  Duyệt
+                </Button>
+              </Tooltip>
+            </Popconfirm>
           )
           return (
             <Space>
-              {verified ? (
-                <Popconfirm
-                  title="Duyệt tài khoản này?"
-                  okText="Duyệt"
-                  cancelText="Huỷ"
-                  onConfirm={() => handleApprove(record.id)}
-                >
-                  {approveBtn}
-                </Popconfirm>
-              ) : (
-                <Tooltip title="Tài xế chưa bấm link xác thực trong email — chưa thể duyệt">
-                  {approveBtn}
-                </Tooltip>
-              )}
+              {approveBtn}
               <Button
                 size="small"
                 danger

@@ -279,7 +279,7 @@ function Music() {
       )}
 
       <Row gutter={[16, 16]} className="mb-4">
-        <Col xs={12} lg={6}>
+        <Col xs={12} lg={6} className="flex">
           <StatCard
             icon={<CustomerServiceOutlined />}
             label="Tổng bài hát"
@@ -287,7 +287,7 @@ function Music() {
             tone="blue"
           />
         </Col>
-        <Col xs={12} lg={6}>
+        <Col xs={12} lg={6} className="flex">
           <StatCard
             icon={<SoundOutlined />}
             label="Đang cho nghe"
@@ -295,7 +295,7 @@ function Music() {
             tone="green"
           />
         </Col>
-        <Col xs={12} lg={6}>
+        <Col xs={12} lg={6} className="flex">
           <StatCard
             icon={<StopOutlined />}
             label="Đã tắt"
@@ -303,7 +303,7 @@ function Music() {
             tone="rose"
           />
         </Col>
-        <Col xs={12} lg={6}>
+        <Col xs={12} lg={6} className="flex">
           <StatCard
             icon={<FlagOutlined />}
             label="Bị báo cáo"

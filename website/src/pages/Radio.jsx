@@ -352,7 +352,7 @@ function Radio() {
       />
 
       <Row gutter={[16, 16]} className="mb-4">
-        <Col xs={12} lg={6}>
+        <Col xs={12} lg={6} className="flex">
           <StatCard
             icon={<WifiOutlined />}
             label="Tổng kênh"
@@ -360,7 +360,7 @@ function Radio() {
             tone="blue"
           />
         </Col>
-        <Col xs={12} lg={6}>
+        <Col xs={12} lg={6} className="flex">
           <StatCard
             icon={<SoundOutlined />}
             label="Đang cho nghe"
@@ -368,7 +368,7 @@ function Radio() {
             tone="green"
           />
         </Col>
-        <Col xs={12} lg={6}>
+        <Col xs={12} lg={6} className="flex">
           <StatCard
             icon={<StopOutlined />}
             label="Đã tắt"
@@ -376,7 +376,7 @@ function Radio() {
             tone="rose"
           />
         </Col>
-        <Col xs={12} lg={6}>
+        <Col xs={12} lg={6} className="flex">
           <StatCard
             icon={<CustomerServiceOutlined />}
             label="Tổng lượt phát"
