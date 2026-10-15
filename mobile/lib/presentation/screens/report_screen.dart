@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'dart:io';
 
 import '../../services/api_client.dart';
@@ -139,6 +141,40 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
+  Future<({double? lat, double? lng, String? address})> _getLocation() async {
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        return (lat: null, lng: null, address: null);
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 6),
+        ),
+      );
+      final placemarks = await placemarkFromCoordinates(
+        pos.latitude,
+        pos.longitude,
+      );
+      final p = placemarks.isNotEmpty ? placemarks.first : null;
+      final parts = [
+        p?.street,
+        p?.subLocality,
+        p?.locality,
+        p?.administrativeArea,
+      ].whereType<String>().where((s) => s.isNotEmpty).toList();
+      final addr = parts.join(', ');
+      return (lat: pos.latitude, lng: pos.longitude, address: addr);
+    } catch (_) {
+      return (lat: null, lng: null, address: null);
+    }
+  }
+
   Future<void> _submitReport() async {
     final note = _noteController.text.trim();
     if (note.isEmpty && _selectedImage == null) {
@@ -148,7 +184,14 @@ class _ReportScreenState extends State<ReportScreen> {
     FocusScope.of(context).unfocus();
     setState(() => _submitting = true);
     try {
-      await _reportApi.submit(note: note, photo: _selectedImage);
+      final loc = await _getLocation();
+      await _reportApi.submit(
+        note: note,
+        photo: _selectedImage,
+        latitude: loc.lat,
+        longitude: loc.lng,
+        address: loc.address,
+      );
       if (!mounted) return;
       _toast('Đã gửi báo cáo tới công ty');
       setState(() {

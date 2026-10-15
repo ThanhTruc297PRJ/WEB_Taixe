@@ -22,6 +22,9 @@ _MAX_NOTE_CHARS = 1000
 async def create_report(
     note: str = Form(""),
     photo: Optional[UploadFile] = File(None),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
+    address: Optional[str] = Form(None),
     user: dict = Depends(get_current_active_driver),
 ):
     note = note.strip()
@@ -37,7 +40,9 @@ async def create_report(
             raise HTTPException(status_code=413, detail="Ảnh quá lớn (tối đa 10MB)")
     try:
         report = driver_report_service.create_report(
-            user["uid"], note, photo_bytes, photo.content_type if photo else None
+            user["uid"], note, photo_bytes, photo.content_type if photo else None,
+            latitude=latitude, longitude=longitude,
+            address=(address or "").strip() or None,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))

@@ -23,12 +23,21 @@ class DriverReportApi {
   final AuthService _auth;
   final ApiClient _c;
 
-  Future<void> submit({required String note, File? photo}) async {
+  Future<void> submit({
+    required String note,
+    File? photo,
+    double? latitude,
+    double? longitude,
+    String? address,
+  }) async {
     final token = await _auth.idToken();
     final req =
         http.MultipartRequest('POST', Uri.parse('$baseUrl/driver-reports/'))
           ..headers['Authorization'] = 'Bearer $token'
           ..fields['note'] = note;
+    if (latitude != null) req.fields['latitude'] = latitude.toString();
+    if (longitude != null) req.fields['longitude'] = longitude.toString();
+    if (address != null && address.isNotEmpty) req.fields['address'] = address;
     if (photo != null) {
       final isPng = photo.path.toLowerCase().endsWith('.png');
       req.files.add(

@@ -91,6 +91,28 @@ function DriverReports() {
       render: (v) => v || <span className="text-slate-400">(không có mô tả)</span>,
     },
     {
+      title: 'Địa chỉ',
+      key: 'address',
+      width: 220,
+      render: (_, r) => {
+        if (!r.address && !r.latitude) return <span className="text-slate-300">—</span>
+        const mapsUrl =
+          r.latitude && r.longitude
+            ? `https://www.google.com/maps?q=${r.latitude},${r.longitude}`
+            : null
+        return (
+          <div className="text-xs">
+            {r.address && <div className="text-slate-700">{r.address}</div>}
+            {mapsUrl && (
+              <a href={mapsUrl} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">
+                Xem bản đồ ↗
+              </a>
+            )}
+          </div>
+        )
+      },
+    },
+    {
       title: 'Ảnh',
       dataIndex: 'photo_url',
       width: 90,

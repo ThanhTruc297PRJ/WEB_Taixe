@@ -39,12 +39,18 @@ def create_report(
     note: str,
     photo_bytes: Optional[bytes],
     content_type: Optional[str],
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    address: Optional[str] = None,
 ) -> dict:
     photo_url = _upload_photo(uid, photo_bytes, content_type) if photo_bytes else None
     data = {
         "driver_id": uid,
         "note": note,
         "photo_url": photo_url,
+        "latitude": latitude,
+        "longitude": longitude,
+        "address": address,
         "status": "new",  # "new" | "resolved"
         "created_at": datetime.now(timezone.utc),
         "resolved_at": None,
