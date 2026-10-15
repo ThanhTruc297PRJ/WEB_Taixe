@@ -157,7 +157,7 @@ class _ReportScreenState extends State<ReportScreen> {
           timeLimit: Duration(seconds: 6),
         ),
       );
-      final placemarks = await placemarkFromCoordinates(
+      final placemarks = await Geocoding().placemarkFromCoordinates(
         pos.latitude,
         pos.longitude,
       );
