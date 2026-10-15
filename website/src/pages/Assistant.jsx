@@ -165,6 +165,8 @@ function KnowledgeBaseTab() {
   const [editing, setEditing] = useState(null) // null = đóng, {} = thêm mới
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
+  const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -230,6 +232,15 @@ function KnowledgeBaseTab() {
     }
   }
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return docs.filter((d) => {
+      if (categoryFilter !== 'all' && d.category !== categoryFilter) return false
+      if (q && !d.title?.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [docs, search, categoryFilter])
+
   const columns = useMemo(
     () => [
       { title: 'STT', key: 'stt', width: 55, render: (_, __, i) => i + 1 },
@@ -285,7 +296,7 @@ function KnowledgeBaseTab() {
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <Text type="secondary" className="text-sm">
           Nội dung markdown. Trợ lý AI tách theo tiêu đề <code>##</code> và tìm
           đoạn liên quan để trả lời tài xế.
@@ -295,13 +306,31 @@ function KnowledgeBaseTab() {
         </Button>
       </div>
 
+      <div className="mb-3 flex flex-wrap gap-2">
+        <Input.Search
+          allowClear
+          placeholder="Tìm tên tài liệu"
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: 240 }}
+        />
+        <Select
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          style={{ width: 180 }}
+          options={[
+            { value: 'all', label: 'Tất cả nhóm' },
+            ...Object.entries(CATEGORY_META).map(([k, v]) => ({ value: k, label: v.label })),
+          ]}
+        />
+      </div>
+
       <Card styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id"
           loading={loading}
           columns={columns}
-          dataSource={docs}
-          pagination={false}
+          dataSource={filtered}
+          pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
           locale={{ emptyText: 'Chưa có tài liệu nào' }}
         />
       </Card>
