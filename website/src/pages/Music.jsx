@@ -341,7 +341,6 @@ function Music() {
           columns={columns}
           dataSource={filtered}
           locale={{ emptyText: 'Chưa có bài hát nào — tài xế tìm nhạc trên app sẽ hiện ở đây' }}
-          scroll={{ x: 'max-content' }}
           pagination={{ pageSize: 12, showSizeChanger: false, hideOnSinglePage: true }}
         />
       </Card>

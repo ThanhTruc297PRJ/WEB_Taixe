@@ -194,7 +194,6 @@ function CostReport() {
               size="small"
               rowKey="vehicleId"
               dataSource={byVehicle}
-              scroll={{ x: 'max-content' }}
               pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
               columns={[
                 {
