@@ -102,7 +102,6 @@ function Vehicles() {
   }, [maintenance])
 
   const filtered = useMemo(() => {
-    setPage(1)
     const q = search.trim().toLowerCase()
     return rows.filter((v) => {
       const status = v.status ?? 'active'
@@ -195,12 +194,12 @@ function Vehicles() {
           allowClear
           placeholder="Tìm theo biển số, hãng, dòng xe"
           defaultValue={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1) }}
           style={{ width: 280 }}
         />
         <Select
           value={statusFilter}
-          onChange={setStatusFilter}
+          onChange={(v) => { setStatusFilter(v); setPage(1) }}
           style={{ width: 190 }}
           options={[
             { value: 'all', label: 'Tất cả trạng thái' },
@@ -209,7 +208,7 @@ function Vehicles() {
         />
         <Select
           value={driverFilter}
-          onChange={setDriverFilter}
+          onChange={(v) => { setDriverFilter(v); setPage(1) }}
           showSearch
           optionFilterProp="label"
           style={{ width: 220 }}
