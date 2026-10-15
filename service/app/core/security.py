@@ -1,8 +1,11 @@
+import logging
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth as firebase_auth
 
 bearer_scheme = HTTPBearer(auto_error=False)
+_log = logging.getLogger("driver_monitoring.security")
 
 
 def get_current_user(
@@ -20,6 +23,7 @@ def get_current_user(
             credentials.credentials, clock_skew_seconds=10
         )
     except Exception as e:
+        _log.warning("verify_id_token failed: %s: %s", type(e).__name__, e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid or expired token: {e}",
