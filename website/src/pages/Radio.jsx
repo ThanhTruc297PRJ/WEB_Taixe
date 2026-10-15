@@ -190,7 +190,8 @@ function Radio() {
   }
 
   const save = async () => {
-    const values = await form.validateFields()
+    let values
+    try { values = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       if (editing?.id) {

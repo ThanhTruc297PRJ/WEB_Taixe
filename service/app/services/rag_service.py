@@ -11,26 +11,21 @@ from app.core.vectorstore import collection
 from app.services.intent_router import INTENT_CATEGORY
 
 _log = logging.getLogger("driver_monitoring.rag")
-_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 _model = None
 _model_tried = False
 
 
 def _get_model():
-    """Lazy init — chỉ khi có key ĐÚNG ĐỊNH DẠNG. Key Gemini bắt đầu bằng
-    'AIza'; chuỗi khác (mã OAuth 'AQ.', v.v.) coi như chưa cấu hình."""
+    """Lazy init — chỉ khi có GEMINI_API_KEY. Hỗ trợ cả format cũ (AIza...)
+    lẫn format mới (AQ...) của Google AI Studio."""
     global _model, _model_tried
     if _model_tried:
         return _model
     _model_tried = True
 
     api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
-    if not api_key.startswith("AIza"):
-        if api_key:
-            _log.warning(
-                "GEMINI_API_KEY sai định dạng (phải bắt đầu 'AIza') — chạy chế "
-                "độ trích đoạn."
-            )
+    if not api_key:
         return None
     try:
         import google.generativeai as genai
@@ -146,9 +141,8 @@ def answer(question: str, intent: str = "safety", n_results: int = 4) -> dict:
 
 def _fallback_answer(intent: str, docs: list[str], sources: list[str]) -> dict:
     note = (
-        "⚠️ Chưa dùng được LLM (thiếu/sai GEMINI_API_KEY) — đang ở chế độ trích "
-        "tài liệu. Key Gemini đúng bắt đầu bằng 'AIza', lấy free ở "
-        "aistudio.google.com/apikey.\n\n"
+        "⚠️ Chưa dùng được LLM (thiếu GEMINI_API_KEY) — đang ở chế độ trích "
+        "tài liệu. Lấy key miễn phí tại aistudio.google.com/apikey.\n\n"
     )
     if intent == "chitchat":
         msg = (

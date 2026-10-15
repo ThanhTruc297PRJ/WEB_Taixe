@@ -164,9 +164,9 @@ function Maintenance() {
     })
 
   const filtered = useMemo(() => {
+    const _val = (d) => (d ? dayjs(d).valueOf() : Infinity)
     let sorted = [...rows].sort(
-      (a, b) =>
-        dayjs(a.scheduled_date).valueOf() - dayjs(b.scheduled_date).valueOf(),
+      (a, b) => _val(a.scheduled_date) - _val(b.scheduled_date),
     )
     if (vehicleFilter)
       sorted = sorted.filter((r) => r.vehicle_id === vehicleFilter)

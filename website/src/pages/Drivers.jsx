@@ -464,7 +464,12 @@ function Drivers() {
               { key: 'reset', icon: <KeyOutlined />, label: 'Đặt lại mật khẩu', onClick: () => handleResetPassword(record) },
               {
                 key: 'del', label: 'Xoá tài xế', danger: true,
-                onClick: () => handleDelete(record.id),
+                onClick: () => modal.confirm({
+                  title: 'Xoá tài xế này?',
+                  content: 'Hành động không thể hoàn tác.',
+                  okText: 'Xoá', okType: 'danger', cancelText: 'Huỷ',
+                  onOk: () => handleDelete(record.id),
+                }),
               },
             ],
           }

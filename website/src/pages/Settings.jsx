@@ -208,6 +208,10 @@ function AdminsTab() {
   const handleAdd = async () => {
     const trimmed = email.trim()
     if (!trimmed) return
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      message.warning('Email không đúng định dạng')
+      return
+    }
     setAdding(true)
     try {
       await grantAdmin(trimmed)

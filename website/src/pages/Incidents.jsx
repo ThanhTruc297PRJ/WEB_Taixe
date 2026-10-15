@@ -167,7 +167,7 @@ function Incidents() {
 
   useEffect(() => {
     getSettings()
-      .then((s) => setThresholds(s.violation_thresholds))
+      .then((s) => s.violation_thresholds && setThresholds(s.violation_thresholds))
       .catch(() => {
         /* giữ mặc định nếu tải cấu hình lỗi — không chặn trang sự cố */
       })
@@ -356,7 +356,7 @@ function Incidents() {
         ))}
       </Row>
 
-      <MilestoneBar points={totalPoints} thresholds={thresholds} />
+      {driverFilter && <MilestoneBar points={totalPoints} thresholds={thresholds} />}
 
       <Space className="mb-4" wrap>
         <Select

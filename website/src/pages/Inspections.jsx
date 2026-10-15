@@ -65,6 +65,7 @@ const isDueSoon = (record) =>
 // Quá hạn khi tem cũ đã hết hạn mà vẫn chưa đăng kiểm xong.
 const isOverdue = (record) =>
   record.status === 'pending' &&
+  !!record.old_sticker_expiry &&
   dayjs(record.old_sticker_expiry).isBefore(dayjs(), 'day')
 
 function Inspections() {
@@ -149,10 +150,9 @@ function Inspections() {
     })
 
   const filtered = useMemo(() => {
+    const _val = (d) => (d ? dayjs(d).valueOf() : Infinity)
     const sorted = [...rows].sort(
-      (a, b) =>
-        dayjs(a.old_sticker_expiry).valueOf() -
-        dayjs(b.old_sticker_expiry).valueOf(),
+      (a, b) => _val(a.old_sticker_expiry) - _val(b.old_sticker_expiry),
     )
     if (statusFilter === 'all') return sorted
     if (statusFilter === 'due') return sorted.filter(isDueSoon)

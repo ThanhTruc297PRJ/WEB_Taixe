@@ -251,7 +251,7 @@ function Dashboard() {
       secondary: d.presence === 'driving' ? 'Đang lái' : 'Trực tuyến',
     }))
     return {
-      total: drivers.length,
+      total: drivers.filter((d) => d.status === 'active').length,
       online: onlineDrivers.length,
       onlineList,
       driving,

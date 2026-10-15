@@ -66,10 +66,10 @@ function CostReport() {
   const byVehicle = useMemo(() => {
     const map = {}
     const add = (vehicleId, amount) => {
-      if (!vehicleId || !amount) return
+      if (!vehicleId || amount == null) return
       map[vehicleId] = (map[vehicleId] || 0) + amount
     }
-    for (const m of maintenance) add(m.vehicle_id, m.cost || 0)
+    for (const m of maintenance) add(m.vehicle_id, m.cost ?? 0)
     for (const i of inspections) add(i.vehicle_id, (i.inspection_fee || 0) + (i.road_fee || 0))
     return Object.entries(map)
       .map(([vehicleId, total]) => ({ vehicleId, total }))

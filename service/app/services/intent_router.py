@@ -46,6 +46,9 @@ _KEYWORDS = {
         "tâm sự", "nói chuyện phiếm", "làm quen", "buồn ngủ quá kể",
         "hello", "xin chào", "chào bạn", "chào trợ lý", "bạn là ai",
         "bạn tên gì", "bạn khoẻ không", "khoẻ không",
+        "tôi đang buồn", "mình đang buồn", "tôi buồn", "mình buồn",
+        "cảm thấy buồn", "đang buồn", "có lời khuyên nào không",
+        "giải trí", "nói chuyện", "rảnh không", "bạn ơi",
     ],
 }
 

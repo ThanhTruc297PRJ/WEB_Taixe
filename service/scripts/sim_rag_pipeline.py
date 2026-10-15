@@ -75,7 +75,7 @@ def main():
         r_dir = rag_service.answer("Đường tới cảng đi lối nào?", "directions")
         ok("directions: sources rỗng", r_dir.get("sources") == [])
 
-        has_key = (os.getenv("GEMINI_API_KEY") or "").strip().startswith("AIza")
+        has_key = bool((os.getenv("GEMINI_API_KEY") or "").strip())
         print(f"\n4) LLM: {'Gemini (có key hợp lệ)' if has_key else 'fallback trích đoạn (miễn phí)'}")
         ok("kết quả có cờ 'llm'", "llm" in r_law)
         # llm=True chỉ khi có key đúng định dạng VÀ Gemini gọi thành công.
